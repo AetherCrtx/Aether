@@ -1,0 +1,21 @@
+[Unit]
+Description=AetherTerminal Core Daemon (One Brain SQLite WAL, Worktree & MCP Hub)
+Documentation=https://github.com/aether-terminal/aether
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/aetherd
+Restart=always
+RestartSec=2
+StandardOutput=journal
+StandardError=journal
+LimitNOFILE=65535
+
+# Sandbox protections
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=%t %h/.local/share/aether %h/.config/aether
+
+[Install]
+WantedBy=default.target

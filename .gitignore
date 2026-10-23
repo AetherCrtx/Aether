@@ -1,0 +1,27 @@
+# Rust target directory
+/target/
+**/*.rs.bk
+*.pdb
+
+# Node / UI
+/ui/node_modules/
+/ui/dist/
+/ui/.vite/
+
+# Tauri build artifacts
+/src-tauri/target/
+
+# Aether runtime artifacts & worktrees
+.aether/
+*.sock
+
+# System / OS
+.DS_Store
+Thumbs.db
+*.log
+
+# Internal & Agent-specific documents
+[0-9]_*.md
+*prd*.md
+project_bundle_clean.txt
+graphify-out/

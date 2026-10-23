@@ -1,0 +1,22 @@
+[package]
+name = "aether-gui"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "AetherTerminal Native Linux GUI Shell powered by Tauri v2"
+
+[dependencies]
+aether-protocol = { workspace = true, features = ["async-codec"] }
+tauri = { version = "2.0", features = ["devtools"] }
+tokio = { workspace = true, features = ["full"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+uuid = { workspace = true }
+libc = "0.2"
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }

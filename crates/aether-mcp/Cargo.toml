@@ -1,0 +1,21 @@
+[package]
+name = "aether-mcp"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "AetherTerminal Standalone MCP Server Binary bridging AI CLIs to the Shared Brain"
+
+[dependencies]
+aether-protocol = { workspace = true, features = ["async-codec"] }
+tokio = { workspace = true, features = ["full"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+uuid = { workspace = true }
+libc = "0.2"
+
+[dev-dependencies]
+aetherd = { path = "../aetherd" }

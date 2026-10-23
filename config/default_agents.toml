@@ -1,0 +1,52 @@
+# AetherTerminal Declarative Agent Profiles Configuration
+# Default profiles for Multi-CLI Agentic Coding Orchestration
+
+[global]
+auto_worktree = true
+mcp_binary_path = "/usr/local/bin/aether-mcp"
+default_sandbox = "workspace-only" # 'unrestricted', 'workspace-only', 'strict'
+
+[agents.claude-code]
+display_name = "Claude Code"
+binary = "claude"
+color = "#D97757"
+supports_mcp = true
+mcp_injection_strategy = "config-flag"
+mcp_args = ["--mcp-config", "{AETHER_GENERATED_MCP_JSON}"]
+headless_args = ["-p", "{PROMPT}", "--output-format", "json"]
+
+[agents.opencode]
+display_name = "OpenCode"
+binary = "opencode"
+color = "#3B82F6"
+supports_mcp = true
+mcp_injection_strategy = "env-var"
+headless_args = ["run", "{PROMPT}"]
+
+[agents.codex]
+display_name = "OpenAI Codex CLI"
+binary = "codex"
+color = "#10B981"
+supports_mcp = true
+headless_args = ["--quiet", "{PROMPT}"]
+
+[agents.antigravity]
+display_name = "Antigravity CLI"
+binary = "antigravity"
+color = "#A855F7"
+supports_mcp = false
+context_injection_strategy = "system-prompt-file"
+args = ["--context-file", "{AETHER_LIVE_CONTEXT_MD}"]
+
+[agents.hermes]
+display_name = "Hermes Agent"
+binary = "hermes"
+color = "#EC4899"
+supports_mcp = true
+
+[agents.shell]
+display_name = "Interactive Shell"
+binary = "bash"
+color = "#64748B"
+supports_mcp = false
+args = ["--login"]

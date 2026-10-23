@@ -1,0 +1,335 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# AetherTerminal Main Command & Multi-CLI Agent Launcher
+# ==============================================================================
+set -euo pipefail
+
+# Ensure standard user toolchains (Rust, local binaries) are available even when started from desktop launcher
+export PATH="${HOME}/.cargo/bin:${HOME}/.local/bin:/usr/local/bin:/usr/bin:/bin:${PATH}"
+
+# Workaround for WebKitGTK blank white window on Linux Wayland with NVIDIA
+export WEBKIT_DISABLE_DMABUF_RENDERER=1
+
+SCRIPT_DIR="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+# If launched without a controlling terminal (e.g. from an app launcher or systemd), redirect output to log
+LOG_DIR="${XDG_STATE_HOME:-${HOME}/.local/state}/aether"
+mkdir -p "${LOG_DIR}"
+
+if [[ ! -t 1 && ! -t 2 ]]; then
+    exec >> "${LOG_DIR}/launcher.log" 2>&1
+    echo "=== [Aether] Launcher invoked at $(date --iso-8601=seconds) (args: $*) ==="
+fi
+
+# Resolve runtime socket path
+UID_NUM="$(id -u)"
+SOCKET_PATH="${AETHER_SOCKET:-${AETHER_SOCK:-${XDG_RUNTIME_DIR:-/run/user/${UID_NUM}}/aether.sock}}"
+export AETHER_SOCKET="${SOCKET_PATH}"
+export AETHER_SOCK="${SOCKET_PATH}"
+
+# Binary search paths - prioritizes release binary for optimal speed and lightweight footprint
+find_binary() {
+    local name="$1"
+    local rel="${PROJECT_ROOT}/target/release/${name}"
+    local deb="${PROJECT_ROOT}/target/debug/${name}"
+    if [[ -x "${rel}" && "${AETHER_DEV:-0}" != "1" ]]; then
+        echo "${rel}"
+    elif [[ -x "${deb}" ]]; then
+        echo "${deb}"
+    elif [[ -x "${rel}" ]]; then
+        echo "${rel}"
+    elif command -v "${name}" >/dev/null 2>&1; then
+        command -v "${name}"
+    else
+        echo ""
+    fi
+}
+
+AETHERD_BIN="$(find_binary aetherd)"
+AETHER_GUI_BIN="$(find_binary aether-gui)"
+AETHER_MCP_BIN="$(find_binary aether-mcp)"
+
+# Check if daemon is active
+is_daemon_running() {
+    if [[ -S "${SOCKET_PATH}" ]]; then
+        # Try connecting with nc or socat or python
+        python3 -c "
+import socket, sys
+s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+try:
+    s.connect('${SOCKET_PATH}')
+    s.close()
+    sys.exit(0)
+except Exception:
+    sys.exit(1)
+" >/dev/null 2>&1
+        return $?
+    fi
+    return 1
+}
+
+# Start daemon if not already running
+ensure_daemon() {
+    if ! is_daemon_running; then
+        echo "[Aether] Starting background core daemon (aetherd)..."
+        if [[ -z "${AETHERD_BIN}" ]]; then
+            echo "[Aether] Error: aetherd binary not found. Build with: cargo build --bin aetherd" >&2
+            exit 1
+        fi
+        nohup "${AETHERD_BIN}" >/dev/null 2>&1 &
+        
+        # Wait up to 5 seconds for socket creation
+        local attempts=0
+        while ! is_daemon_running && [[ ${attempts} -lt 25 ]]; do
+            sleep 0.2
+            attempts=$((attempts + 1))
+        done
+
+        if ! is_daemon_running; then
+            echo "[Aether] Warning: aetherd started but socket not ready yet at ${SOCKET_PATH}" >&2
+        else
+            echo "[Aether] Daemon active on ${SOCKET_PATH}"
+        fi
+    fi
+}
+
+# Generate MCP config for Claude Code
+generate_mcp_config() {
+    local mcp_bin="${AETHER_MCP_BIN}"
+    if [[ -z "${mcp_bin}" ]]; then
+        mcp_bin="aether-mcp"
+    fi
+    local mcp_json="/tmp/aether-mcp-${UID_NUM}.json"
+    cat > "${mcp_json}" <<EOF
+{
+  "mcpServers": {
+    "aether": {
+      "command": "${mcp_bin}",
+      "args": [],
+      "env": {
+        "AETHER_SOCKET": "${SOCKET_PATH}",
+        "AETHER_SOCK": "${SOCKET_PATH}"
+      }
+    }
+  }
+}
+EOF
+    echo "${mcp_json}"
+}
+
+# CLI Subcommands
+cmd="${1:-}"
+
+case "${cmd}" in
+    daemon)
+        shift || true
+        if [[ -z "${AETHERD_BIN}" ]]; then
+            echo "Error: aetherd binary not found." >&2
+            exit 1
+        fi
+        exec "${AETHERD_BIN}" "$@"
+        ;;
+
+    stop)
+        echo "[Aether] Stopping daemon..."
+        pkill -f "aetherd" || true
+        if [[ -S "${SOCKET_PATH}" ]]; then
+            rm -f "${SOCKET_PATH}"
+        fi
+        echo "[Aether] Daemon stopped."
+        ;;
+
+    restart)
+        echo "[Aether] Restarting daemon..."
+        pkill -f "aetherd" || true
+        if [[ -S "${SOCKET_PATH}" ]]; then
+            rm -f "${SOCKET_PATH}"
+        fi
+        sleep 0.5
+        ensure_daemon
+        echo "[Aether] Daemon restarted successfully."
+        ;;
+
+    status)
+        if is_daemon_running; then
+            echo "AetherDaemon: RUNNING (Socket: ${SOCKET_PATH})"
+        else
+            echo "AetherDaemon: STOPPED (Socket: ${SOCKET_PATH} inactive)"
+        fi
+        ;;
+
+    mcp)
+        shift || true
+        if [[ -z "${AETHER_MCP_BIN}" ]]; then
+            echo "Error: aether-mcp binary not found. Build with: cargo build --bin aether-mcp" >&2
+            exit 1
+        fi
+        exec "${AETHER_MCP_BIN}" "$@"
+        ;;
+
+    claude)
+        shift || true
+        ensure_daemon
+        MCP_CFG="$(generate_mcp_config)"
+        echo "[Aether] Launching Claude Code with Aether One Brain MCP bridge..."
+        if command -v claude >/dev/null 2>&1; then
+            exec claude --mcp-config "${MCP_CFG}" "$@"
+        else
+            echo "Error: claude binary not found in PATH." >&2
+            exit 1
+        fi
+        ;;
+
+    opencode)
+        shift || true
+        ensure_daemon
+        MCP_CFG="$(generate_mcp_config)"
+        echo "[Aether] Launching OpenCode with Aether One Brain..."
+        if command -v opencode >/dev/null 2>&1; then
+            export AETHER_MCP_CONFIG="${MCP_CFG}"
+            exec opencode "$@"
+        else
+            echo "Error: opencode binary not found in PATH." >&2
+            exit 1
+        fi
+        ;;
+
+    codex)
+        shift || true
+        ensure_daemon
+        MCP_CFG="$(generate_mcp_config)"
+        echo "[Aether] Launching Codex CLI with Aether One Brain..."
+        if command -v codex >/dev/null 2>&1; then
+            export AETHER_MCP_CONFIG="${MCP_CFG}"
+            exec codex "$@"
+        else
+            echo "Error: codex binary not found in PATH." >&2
+            exit 1
+        fi
+        ;;
+
+    antigravity)
+        shift || true
+        ensure_daemon
+        echo "[Aether] Launching Antigravity CLI with Aether Context..."
+        if command -v antigravity >/dev/null 2>&1; then
+            exec antigravity "$@"
+        else
+            echo "Error: antigravity binary not found in PATH." >&2
+            exit 1
+        fi
+        ;;
+
+    hermes)
+        shift || true
+        ensure_daemon
+        MCP_CFG="$(generate_mcp_config)"
+        echo "[Aether] Launching Hermes with Aether One Brain..."
+        if command -v hermes >/dev/null 2>&1; then
+            export AETHER_MCP_CONFIG="${MCP_CFG}"
+            exec hermes "$@"
+        else
+            echo "Error: hermes binary not found in PATH." >&2
+            exit 1
+        fi
+        ;;
+
+    gui)
+        shift || true
+        ensure_daemon
+        if [[ -z "${AETHER_GUI_BIN}" ]]; then
+            echo "Error: aether-gui binary not found. Build with: cargo build --bin aether-gui" >&2
+            exit 1
+        fi
+        exec "${AETHER_GUI_BIN}" "$@"
+        ;;
+
+    install-desktop)
+        echo "[Aether] Installing desktop launcher & icons to ~/.local/share/applications..."
+        mkdir -p "${HOME}/.local/share/applications" \
+                 "${HOME}/.local/share/pixmaps" \
+                 "${HOME}/.local/share/icons/hicolor/512x512/apps" \
+                 "${HOME}/.local/share/icons/hicolor/128x128/apps" \
+                 "${HOME}/.local/share/icons/hicolor/32x32/apps" \
+                 "${HOME}/.local/bin"
+
+        # 1. Desktop Entry
+        cp "${PROJECT_ROOT}/packaging/desktop/aether.desktop" "${HOME}/.local/share/applications/aether.desktop"
+        chmod +x "${HOME}/.local/share/applications/aether.desktop"
+
+        mkdir -p "${HOME}/.local/share/icons/hicolor/scalable/apps"
+        cp "${PROJECT_ROOT}/Aether.svg" "${HOME}/.local/share/icons/hicolor/scalable/apps/aether.svg"
+        cp "${PROJECT_ROOT}/Aether.svg" "${HOME}/.local/share/pixmaps/aether.svg"
+        cp "${PROJECT_ROOT}/crates/aether-gui/icons/icon.png" "${HOME}/.local/share/icons/hicolor/512x512/apps/aether.png"
+        cp "${PROJECT_ROOT}/crates/aether-gui/icons/128x128.png" "${HOME}/.local/share/icons/hicolor/128x128/apps/aether.png"
+        cp "${PROJECT_ROOT}/crates/aether-gui/icons/32x32.png" "${HOME}/.local/share/icons/hicolor/32x32/apps/aether.png"
+        cp "${PROJECT_ROOT}/crates/aether-gui/icons/icon.png" "${HOME}/.local/share/pixmaps/aether.png"
+
+        # 3. Binaries in ~/.local/bin
+        ln -sf "${PROJECT_ROOT}/bin/aether" "${HOME}/.local/bin/aether"
+        for agent_cli in aether-claude aether-opencode aether-codex aether-antigravity aether-hermes; do
+            if [[ -f "${PROJECT_ROOT}/bin/${agent_cli}" ]]; then
+                ln -sf "${PROJECT_ROOT}/bin/${agent_cli}" "${HOME}/.local/bin/${agent_cli}"
+            fi
+        done
+
+        # Release binaries symlink if available
+        if [[ -x "${PROJECT_ROOT}/target/release/aetherd" ]]; then
+            ln -sf "${PROJECT_ROOT}/target/release/aetherd" "${HOME}/.local/bin/aetherd"
+        fi
+        if [[ -x "${PROJECT_ROOT}/target/release/aether-gui" ]]; then
+            ln -sf "${PROJECT_ROOT}/target/release/aether-gui" "${HOME}/.local/bin/aether-gui"
+        fi
+        if [[ -x "${PROJECT_ROOT}/target/release/aether-mcp" ]]; then
+            ln -sf "${PROJECT_ROOT}/target/release/aether-mcp" "${HOME}/.local/bin/aether-mcp"
+        fi
+
+        # 4. Refresh Desktop & Icon Databases
+        if command -v update-desktop-database >/dev/null 2>&1; then
+            update-desktop-database "${HOME}/.local/share/applications" 2>/dev/null || true
+        fi
+        if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+            gtk-update-icon-cache -f -t "${HOME}/.local/share/icons/hicolor" 2>/dev/null || true
+        fi
+
+        echo "[Aether] Desktop entry installed. AetherTerminal is now discoverable in app launchers (fuzzel, rofi, wofi, quickshell)."
+        ;;
+
+    help|-h|--help)
+        echo "AetherTerminal - Multi-CLI Agentic Coding Orchestration"
+        echo ""
+        echo "Usage: aether [COMMAND] [ARGS...]"
+        echo ""
+        echo "Commands:"
+        echo "  (none)          Start daemon and launch AetherTerminal GUI"
+        echo "  gui             Launch AetherTerminal GUI directly"
+        echo "  daemon          Run aetherd in foreground"
+        echo "  status          Check aetherd status and socket health"
+        echo "  stop            Stop running aetherd daemon"
+        echo "  restart         Restart aetherd daemon"
+        echo "  mcp             Run standalone stdio MCP server for agents"
+        echo "  install-desktop Install .desktop entry and icons for system app launchers"
+        echo "  claude [...]    Run Claude Code CLI with Aether One Brain MCP injected"
+        echo "  opencode [...]  Run OpenCode CLI with Aether One Brain MCP injected"
+        echo "  codex [...]     Run Codex CLI with Aether One Brain MCP injected"
+        echo "  antigravity     Run Antigravity CLI with Aether One Brain context"
+        echo ""
+        ;;
+
+    *)
+        # Default action: ensure daemon is running and start GUI
+        ensure_daemon
+        if [[ -z "${AETHER_GUI_BIN}" ]]; then
+            echo "[Aether] aether-gui binary not found. Compiling aether-gui now..."
+            cargo build --manifest-path "${PROJECT_ROOT}/Cargo.toml" -p aether-gui
+            AETHER_GUI_BIN="$(find_binary aether-gui)"
+        fi
+        if [[ -n "${AETHER_GUI_BIN}" ]]; then
+            exec "${AETHER_GUI_BIN}" "$@"
+        else
+            echo "Error: aether-gui binary could not be built." >&2
+            exit 1
+        fi
+        ;;
+esac

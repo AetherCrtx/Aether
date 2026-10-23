@@ -1,0 +1,29 @@
+[Desktop Entry]
+Name=AetherTerminal
+GenericName=Agentic Terminal Emulator
+Comment=Multi-CLI Agentic Coding Orchestration Terminal with Shared Brain & Obsidian Sync
+Exec=/home/rasshqa/projects/Elliot/bin/aether gui
+Path=/home/rasshqa
+Icon=aether
+Terminal=false
+Type=Application
+Categories=Development;TerminalEmulator;System;Utility;
+Keywords=terminal;agent;claude;opencode;codex;mcp;aether;
+StartupWMClass=aether-gui
+Actions=Claude;OpenCode;Codex;DaemonStatus;
+
+[Desktop Action Claude]
+Name=New Claude Code Agent
+Exec=kitty -e /home/rasshqa/projects/Elliot/bin/aether claude
+
+[Desktop Action OpenCode]
+Name=New OpenCode Agent
+Exec=kitty -e /home/rasshqa/projects/Elliot/bin/aether opencode
+
+[Desktop Action Codex]
+Name=New Codex Agent
+Exec=kitty -e /home/rasshqa/projects/Elliot/bin/aether codex
+
+[Desktop Action DaemonStatus]
+Name=Check Aether Daemon Status
+Exec=kitty -e /home/rasshqa/projects/Elliot/bin/aether status
