@@ -4,6 +4,7 @@ import {
   useAetherStore,
   spawnAgentPane,
   sendPtyInput,
+  enqueuePipelineStage,
 } from '../stores/aetherStore';
 import { Command, Sparkles, ArrowRight, X, Bot, FileText, Send } from 'lucide-react';
 
@@ -34,27 +35,37 @@ export const OrchestratorBar: React.FC = () => {
   const handleExecute = async () => {
     if (!query.trim()) return;
 
-    // Check for pipeline syntax "@agent1 prompt -> @agent2 prompt"
-    const stages = query.split('->').map((s) => s.trim());
+    // Pipeline syntax: "@agent1 prompt -> @agent2 prompt -> ..."
+    const stages = query.split('->').map((s) => s.trim()).filter(Boolean);
 
-    for (const stage of stages) {
-      // Find @agent tag
+    const parsed = stages.map((stage) => {
       const match = stage.match(/@([\w-]+)/);
       const rawTag = match ? match[1] : 'claude-code';
-      const agentType = normalizeCliType(rawTag);
-      const prompt = stage.replace(/@[\w-]+/, '').trim();
+      return {
+        targetCli: normalizeCliType(rawTag),
+        prompt: stage.replace(/@[\w-]+/, '').trim(),
+      };
+    });
 
-      // Check if pane for agentType is already active, otherwise spawn one
-      const existingPane = store.panes.find((p) => p.cliType === agentType);
+    const runStage = async (stage: { targetCli: string; prompt: string }) => {
+      const existingPane = store.panes.find((p) => p.cliType === stage.targetCli);
       if (existingPane) {
-        sendPtyInput(existingPane.id, `${prompt}\n`);
-      } else {
-        const newlyCreated = await spawnAgentPane(agentType, true);
-        if (newlyCreated) {
-          setTimeout(() => {
-            sendPtyInput(newlyCreated.id, `${prompt}\n`);
-          }, 600);
-        }
+        await sendPtyInput(existingPane.id, `${stage.prompt}\n`);
+        return;
+      }
+      const newlyCreated = await spawnAgentPane(stage.targetCli, true);
+      if (newlyCreated) {
+        setTimeout(() => {
+          sendPtyInput(newlyCreated.id, `${stage.prompt}\n`);
+        }, 600);
+      }
+    };
+
+    if (parsed.length > 0) {
+      await runStage(parsed[0]);
+      // Stage 1 runs immediately; later stages wait for an explicit advance signal
+      for (const stage of parsed.slice(1)) {
+        enqueuePipelineStage(stage);
       }
     }
 

@@ -23,11 +23,17 @@ async fn test_daemon_unix_socket_integration() -> Result<(), Box<dyn std::error:
     let db = BrainDb::open_in_memory()?;
     let (event_tx, _) = broadcast::channel::<IpcEvent>(1024);
     let pty_manager = Arc::new(PtyManager::new(event_tx.clone()));
+    let obsidian_sync = Arc::new(aetherd::obsidian_sync::ObsidianSyncEngine::new(
+        db.clone(),
+        "default",
+        temp_dir.join("test_vault"),
+    ));
 
     let ctx = DaemonContext {
         db,
         pty_manager,
         event_tx,
+        obsidian_sync,
     };
 
     let listener = UnixListener::bind(&socket_path)?;

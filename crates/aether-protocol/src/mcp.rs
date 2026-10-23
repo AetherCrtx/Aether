@@ -207,6 +207,18 @@ fn default_folder() -> String {
     "Architecture".to_string()
 }
 
+/// Tool 8: aether_release_module
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ReleaseModuleArgs {
+    pub files: Vec<String>,
+}
+
+/// Tool 9: aether_create_snapshot
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CreateSnapshotArgs {
+    pub summary: String,
+}
+
 /// Predefined tool catalog for all Aether MCP tools
 pub fn all_aether_mcp_tools() -> Vec<McpTool> {
     vec![
@@ -347,6 +359,35 @@ pub fn all_aether_mcp_tools() -> Vec<McpTool> {
                     "markdown": {
                         "type": "string",
                         "description": "Markdown content to append"
+                    }
+                }
+            }),
+        },
+        McpTool {
+            name: "aether_release_module".to_string(),
+            description: "Releases advisory file locks previously claimed via aether_claim_module so parallel agent panes can edit those files again.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "required": ["files"],
+                "properties": {
+                    "files": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "List of relative file paths to release"
+                    }
+                }
+            }),
+        },
+        McpTool {
+            name: "aether_create_snapshot".to_string(),
+            description: "Captures a time-travel safety checkpoint of the current worktree state so changes can be rolled back later without polluting the git log.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "required": ["summary"],
+                "properties": {
+                    "summary": {
+                        "type": "string",
+                        "description": "Short description of the checkpoint (e.g. 'Before refactoring auth middleware')"
                     }
                 }
             }),

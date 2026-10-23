@@ -6,7 +6,8 @@ pub mod tool_detector;
 
 use ipc_bridge::{
     cmd_check_pane_process, cmd_claim_module, cmd_create_snapshot, cmd_detect_available_tools,
-    cmd_get_shared_context, cmd_get_worktree_diff, cmd_kill_pane, cmd_list_panes, cmd_list_snapshots,
+    cmd_get_shared_context, cmd_get_scrollback, cmd_get_worktree_diff, cmd_kill_pane, cmd_list_panes, cmd_list_snapshots,
+    cmd_list_workflows,
     cmd_merge_worktree, cmd_publish_blackboard, cmd_read_obsidian_note, cmd_release_module,
     cmd_resize_pane, cmd_rollback_snapshot, cmd_send_pty_input, cmd_spawn_pane,
     cmd_update_obsidian_task, cmd_validate_tool, start_event_listener, GuiBridgeState,
@@ -46,6 +47,7 @@ fn main() {
             cmd_check_pane_process,
             cmd_list_panes,
             cmd_get_shared_context,
+            cmd_get_scrollback,
             cmd_publish_blackboard,
             cmd_claim_module,
             cmd_release_module,
@@ -55,6 +57,7 @@ fn main() {
             cmd_rollback_snapshot,
             cmd_list_snapshots,
             cmd_read_obsidian_note,
+            cmd_list_workflows,
             cmd_update_obsidian_task,
             cmd_detect_available_tools,
             cmd_validate_tool
@@ -62,6 +65,7 @@ fn main() {
         .build(tauri::generate_context!())
         .expect("error while building AetherTerminal application")
         .run(|_app_handle, event| {
-            info!("Tauri RunEvent: {:?}", event);
+            // Fires every frame; trace level keeps the launcher log readable.
+            tracing::trace!("Tauri RunEvent: {:?}", event);
         });
 }

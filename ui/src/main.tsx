@@ -20,6 +20,8 @@ import {
   AGENT_PALETTES,
   setDefaultShell,
   toggleCustomToolModal,
+  advancePipelineStage,
+  clearPipeline,
 } from './stores/aetherStore';
 
 import { TerminalGrid } from './components/TerminalGrid';
@@ -31,6 +33,7 @@ import { ObsidianSidebar } from './components/ObsidianSidebar';
 import { CustomToolModal } from './components/CustomToolModal';
 import { ConfirmCloseModal } from './components/ConfirmCloseModal';
 import { BackgroundTasksDrawer } from './components/BackgroundTasksDrawer';
+import { WorkflowsModal } from './components/WorkflowsModal';
 
 import {
   Terminal,
@@ -45,6 +48,7 @@ import {
   Layers,
   ChevronDown,
   SlidersHorizontal,
+  X,
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -123,6 +127,32 @@ const App: React.FC = () => {
 
         {/* Chrome-Style Tabs & '+' Button directly in Header */}
         <ChromeHeaderTabs />
+
+        {/* Pending Pipeline Stage Banner */}
+        {store.pipelineActive && store.pipelineQueue.length > 0 && (
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-950/60 border border-amber-600/50 text-[10px] font-mono text-amber-200 shrink-0">
+            <span className="hidden lg:inline">
+              Next stage: @{store.pipelineQueue[0].targetCli}
+            </span>
+            <span className="px-1 rounded-full bg-amber-600 text-white text-[9px] font-bold">
+              {store.pipelineQueue.length}
+            </span>
+            <button
+              onClick={() => advancePipelineStage()}
+              className="px-1.5 py-0.5 rounded bg-amber-600 hover:bg-amber-500 text-white font-semibold transition-colors"
+              title="Advance Pipeline Stage (Alt+Shift+P)"
+            >
+              Advance
+            </button>
+            <button
+              onClick={() => clearPipeline()}
+              className="p-0.5 rounded text-amber-300 hover:text-white transition-colors"
+              title="Cancel remaining stages"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        )}
 
         {/* Global Action Toolbar */}
         <div className="flex items-center space-x-1 sm:space-x-1.5 shrink-0">
@@ -433,6 +463,7 @@ const App: React.FC = () => {
       <CustomToolModal />
       <ConfirmCloseModal />
       <BackgroundTasksDrawer />
+      <WorkflowsModal />
     </div>
   );
 };

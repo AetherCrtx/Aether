@@ -97,6 +97,7 @@ pub enum IpcRequestPayload {
     KillPane(KillPaneRequest),
     ListPanes { workspace_id: Option<String> },
     GetPaneStatus { pane_id: String },
+    GetScrollback { pane_id: String },
 
     // Workspace
     InitWorkspace(InitWorkspaceRequest),
@@ -124,6 +125,7 @@ pub enum IpcRequestPayload {
     ObsidianUpdateTask(ObsidianUpdateTaskRequest),
     ObsidianAppendMemory(ObsidianAppendMemoryRequest),
     ObsidianSearch(ObsidianSearchRequest),
+    ListWorkflows { workspace_id: String },
 
     // Real-Time Event Subscription
     SubscribeEvents { workspace_id: Option<String> },
@@ -266,6 +268,18 @@ pub struct ObsidianSearchRequest {
     pub limit: usize,
 }
 
+/// Parameterized command template stored as markdown in the vault's Workflows folder.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct WorkflowDefinition {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub command_template: String,
+    pub tags: Vec<String>,
+    /// Vault-relative markdown path, so the GUI can open the source note.
+    pub relative_path: String,
+}
+
 // ----------------------------------------------------------------------------
 // Response Payloads
 // ----------------------------------------------------------------------------
@@ -278,6 +292,7 @@ pub enum IpcResponsePayload {
     PaneKilled { pane_id: String },
     PaneList(Vec<PaneSummary>),
     PaneStatus(AgentStatus),
+    ScrollbackData { pane_id: String, data: Vec<u8> },
     Workspace(WorkspaceInfo),
     SharedContext(SharedContextSummary),
     BlackboardPublished { entry_id: i64 },
@@ -294,6 +309,7 @@ pub enum IpcResponsePayload {
     ObsidianTaskUpdated,
     ObsidianMemoryAppended,
     ObsidianSearchResults(Vec<ObsidianSearchResult>),
+    WorkflowList(Vec<WorkflowDefinition>),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -395,6 +411,18 @@ pub enum IpcEvent {
         pane_id: String,
         snapshot_id: String,
         summary: String,
+    },
+    /// Agent requested an interactive pane for a delegated task
+    DelegationPaneRequested {
+        workspace_id: String,
+        caller_agent_id: String,
+        target_cli: String,
+        prompt: String,
+    },
+    /// Obsidian note was modified externally and re-indexed
+    ObsidianNoteUpdated {
+        workspace_id: String,
+        relative_path: String,
     },
 }
 

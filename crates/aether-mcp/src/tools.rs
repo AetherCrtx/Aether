@@ -1,13 +1,14 @@
 use aether_protocol::agent::BlackboardEntryType;
 use aether_protocol::ipc::async_codec::{read_ipc_message, write_ipc_message};
 use aether_protocol::ipc::{
-    ClaimModuleRequest, DelegateTaskRequest, GetSharedContextRequest, IpcMessage, IpcRequest, IpcRequestPayload,
-    IpcResponsePayload, ObsidianAppendMemoryRequest, ObsidianReadNoteRequest,
-    ObsidianUpdateTaskRequest, PublishBlackboardRequest,
+    ClaimModuleRequest, CreateSnapshotRequest, DelegateTaskRequest, GetSharedContextRequest, IpcMessage,
+    IpcRequest, IpcRequestPayload, IpcResponsePayload, ObsidianAppendMemoryRequest,
+    ObsidianReadNoteRequest, ObsidianUpdateTaskRequest, PublishBlackboardRequest, ReleaseModuleRequest,
 };
 use aether_protocol::mcp::{
-    ClaimModuleArgs, DelegateTaskArgs, GetSharedContextArgs, McpToolResult,
+    ClaimModuleArgs, CreateSnapshotArgs, DelegateTaskArgs, GetSharedContextArgs, McpToolResult,
     ObsidianAppendMemoryArgs, ObsidianReadNoteArgs, ObsidianUpdateTaskArgs, PublishBlackboardArgs,
+    ReleaseModuleArgs,
 };
 use serde_json::Value;
 use tokio::net::UnixStream;
@@ -87,6 +88,22 @@ impl McpToolHandler {
                     Err(e) => return McpToolResult::error(format!("Invalid arguments: {e}")),
                 };
                 self.obsidian_append_memory(parsed).await
+            }
+
+            "aether_release_module" => {
+                let parsed: ReleaseModuleArgs = match serde_json::from_value(args) {
+                    Ok(a) => a,
+                    Err(e) => return McpToolResult::error(format!("Invalid arguments: {e}")),
+                };
+                self.release_module(parsed).await
+            }
+
+            "aether_create_snapshot" => {
+                let parsed: CreateSnapshotArgs = match serde_json::from_value(args) {
+                    Ok(a) => a,
+                    Err(e) => return McpToolResult::error(format!("Invalid arguments: {e}")),
+                };
+                self.create_snapshot(parsed).await
             }
 
             unknown => McpToolResult::error(format!("Unknown tool: {unknown}")),
@@ -312,6 +329,43 @@ impl McpToolHandler {
             Ok(IpcResponsePayload::ObsidianMemoryAppended) => McpToolResult::text(format!(
                 "Successfully saved note '{}' to Obsidian folder '{}'!",
                 args.title, args.folder
+            )),
+            Ok(_) => McpToolResult::error("Unexpected response payload from daemon"),
+            Err(e) => McpToolResult::error(e),
+        }
+    }
+
+    async fn release_module(&self, args: ReleaseModuleArgs) -> McpToolResult {
+        let req = IpcRequestPayload::ReleaseModule(ReleaseModuleRequest {
+            workspace_id: self.workspace_id.clone(),
+            agent_id: self.agent_id.clone(),
+            files: args.files.clone(),
+        });
+
+        match self.send_daemon_request(req).await {
+            Ok(IpcResponsePayload::ModuleReleased) => McpToolResult::text(format!(
+                "Released advisory locks for {} files: {:?}",
+                args.files.len(),
+                args.files
+            )),
+            Ok(_) => McpToolResult::error("Unexpected response payload from daemon"),
+            Err(e) => McpToolResult::error(e),
+        }
+    }
+
+    async fn create_snapshot(&self, args: CreateSnapshotArgs) -> McpToolResult {
+        let req = IpcRequestPayload::CreateSnapshot(CreateSnapshotRequest {
+            pane_id: self.agent_id.clone(),
+            summary: args.summary.clone(),
+        });
+
+        match self.send_daemon_request(req).await {
+            Ok(IpcResponsePayload::SnapshotCreated {
+                snapshot_id,
+                git_tree_oid,
+            }) => McpToolResult::text(format!(
+                "Snapshot '{}' created ({}). Tree: {}. Restore it later with aether_rollback via the GUI Time Travel slider.",
+                args.summary, snapshot_id, git_tree_oid
             )),
             Ok(_) => McpToolResult::error("Unexpected response payload from daemon"),
             Err(e) => McpToolResult::error(e),

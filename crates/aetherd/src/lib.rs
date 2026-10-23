@@ -16,4 +16,5 @@ pub struct DaemonContext {
     pub db: BrainDb,
     pub pty_manager: Arc<PtyManager>,
     pub event_tx: broadcast::Sender<IpcEvent>,
+    pub obsidian_sync: Arc<crate::obsidian_sync::ObsidianSyncEngine>,
 }

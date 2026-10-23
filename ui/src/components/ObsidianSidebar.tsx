@@ -41,6 +41,13 @@ export const ObsidianSidebar: React.FC = () => {
     }
   }, [state.obsidianSidebarOpen]);
 
+  // Auto-reload the open note when aetherd reports an external vault edit
+  useEffect(() => {
+    if (state.obsidianSidebarOpen && state.obsidianRefreshTick > 0) {
+      loadNote(notePath);
+    }
+  }, [state.obsidianRefreshTick]);
+
   const loadNote = async (path: string) => {
     setLoadingNote(true);
     try {

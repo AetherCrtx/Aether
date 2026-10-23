@@ -33,6 +33,120 @@ pub enum PtyError {
 
 const DEFAULT_RING_BUFFER_CAPACITY: usize = 512 * 1024; // 512 KB per pane
 
+/// Shell metacharacters that require a real shell to interpret the command line.
+const SHELL_OPERATORS: [&str; 7] = ["&&", "||", "|", ";", ">", "<", "&"];
+
+fn has_shell_operators(raw: &str) -> bool {
+    SHELL_OPERATORS.iter().any(|op| raw.contains(op))
+}
+
+/// Split a command string into tokens, honoring single and double quotes and backslash escapes.
+fn split_command_tokens(raw: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    let mut quote: Option<char> = None;
+    let mut has_token = false;
+    let mut chars = raw.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        match quote {
+            Some(q) => {
+                if ch == '\\' && q == '"' {
+                    if let Some(&next) = chars.peek() {
+                        current.push(next);
+                        chars.next();
+                    }
+                } else if ch == q {
+                    quote = None;
+                } else {
+                    current.push(ch);
+                }
+            }
+            None => match ch {
+                '\'' | '"' => {
+                    quote = Some(ch);
+                    has_token = true;
+                }
+                '\\' => {
+                    if let Some(&next) = chars.peek() {
+                        current.push(next);
+                        chars.next();
+                        has_token = true;
+                    }
+                }
+                c if c.is_whitespace() => {
+                    if has_token || !current.is_empty() {
+                        tokens.push(std::mem::take(&mut current));
+                        has_token = false;
+                    }
+                }
+                c => {
+                    current.push(c);
+                    has_token = true;
+                }
+            },
+        }
+    }
+
+    if has_token || !current.is_empty() {
+        tokens.push(current);
+    }
+
+    tokens
+}
+
+/// Resolve a bare command name against PATH; absolute/relative paths pass through untouched.
+fn resolve_shell_command(cmd_opt: Option<&str>) -> String {
+    match cmd_opt {
+        Some("shell") | None => std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string()),
+        Some(cmd) => {
+            if cmd.contains('/') {
+                return cmd.to_string();
+            }
+            if let Ok(path_var) = std::env::var("PATH") {
+                for dir in path_var.split(':') {
+                    let candidate = PathBuf::from(dir).join(cmd);
+                    if candidate.is_file() {
+                        return candidate.to_string_lossy().to_string();
+                    }
+                }
+            }
+            cmd.to_string()
+        }
+    }
+}
+
+/// Resolve the executable plus argument vector for a spawn request.
+///
+/// A raw command string such as "npm run dev" or "echo hello && uname -a" arrives as a
+/// single token; passing it to CommandBuilder::new() would look for a binary literally named
+/// "npm run dev". Split simple command lines into exe + args, and hand anything with shell
+/// operators to the user's login shell via `-c`.
+fn resolve_exec_and_args(command: Option<&str>, args: Vec<String>) -> (String, Vec<String>) {
+    let raw = match command {
+        Some(c) if !c.trim().is_empty() => c.trim().to_string(),
+        _ => return (resolve_shell_command(command), args),
+    };
+
+    // Explicit args mean the caller already separated the binary from its flags.
+    if !args.is_empty() {
+        return (resolve_shell_command(Some(&raw)), args);
+    }
+
+    if has_shell_operators(&raw) {
+        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
+        return (shell, vec!["-c".to_string(), raw]);
+    }
+
+    let tokens = split_command_tokens(&raw);
+    if tokens.len() <= 1 {
+        return (resolve_shell_command(Some(&raw)), args);
+    }
+
+    let exe = resolve_shell_command(Some(&tokens[0]));
+    (exe, tokens[1..].to_vec())
+}
+
 /// Active session representing a single pseudo-terminal child process
 pub struct PaneSession {
     pub pane_id: String,
@@ -155,32 +269,8 @@ impl PtyManager {
             })
             .map_err(|e| PtyError::OpenPty(e.to_string()))?;
 
-fn resolve_shell_command(cmd_opt: Option<&str>) -> String {
-    match cmd_opt {
-        Some("shell") | None => {
-            std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string())
-        }
-        Some(cmd) => {
-            if cmd.contains('/') {
-                return cmd.to_string();
-            }
-            if let Ok(path_var) = std::env::var("PATH") {
-                for dir in path_var.split(':') {
-                    let candidate = PathBuf::from(dir).join(cmd);
-                    if candidate.is_file() {
-                        return candidate.to_string_lossy().to_string();
-                    }
-                }
-            }
-            cmd.to_string()
-        }
-    }
-}
-
         // Determine executable command
-        let exec_cmd = resolve_shell_command(command.as_deref());
-
-        let mut final_args = args;
+        let (exec_cmd, mut final_args) = resolve_exec_and_args(command.as_deref(), args);
         // If spawning an interactive shell with no arguments, pass login/interactive flags
         // so user profile, fastfetch, and completions load properly
         if final_args.is_empty() {
@@ -423,10 +513,32 @@ fn resolve_shell_command(cmd_opt: Option<&str>) -> String {
         session.active.store(false, Ordering::SeqCst);
         if let Some(pid) = session.pid {
             let sig = signal.unwrap_or(15); // SIGTERM by default
+
+            // Collect the full descendant tree BEFORE signalling anything so children are
+            // still attached to their parents in /proc.
+            let mut descendants: Vec<u32> = get_process_tree_pids(pid).into_iter().collect();
+            // Children first, root shell last.
+            descendants.sort_unstable_by(|a, b| {
+                let depth_a = proc_depth(*a);
+                let depth_b = proc_depth(*b);
+                depth_b.cmp(&depth_a).then(b.cmp(a))
+            });
+
+            // Signal the process group first so anything that ignored the tree walk still dies.
             unsafe {
-                libc::kill(pid as i32, sig);
+                libc::kill(-(pid as i32), sig);
             }
-            debug!("Sent signal {} to pane {} (pid {})", sig, pane_id, pid);
+
+            for child_pid in descendants {
+                unsafe {
+                    libc::kill(child_pid as i32, sig);
+                }
+            }
+
+            debug!(
+                "Sent signal {} to pane {} (pid {}) and its process tree",
+                sig, pane_id, pid
+            );
         }
 
         Ok(())
@@ -459,6 +571,30 @@ fn resolve_shell_command(cmd_opt: Option<&str>) -> String {
             None => Vec::new(),
         }
     }
+}
+
+/// Depth of a PID in the process tree, used to signal children before their parents.
+fn proc_depth(pid: u32) -> u32 {
+    let mut depth = 0;
+    let mut current = pid;
+    while depth < 64 {
+        let stat = match std::fs::read_to_string(format!("/proc/{current}/stat")) {
+            Ok(s) => s,
+            Err(_) => break,
+        };
+        // Field 4 is ppid; comm may contain spaces so parse after the closing paren.
+        let ppid = stat
+            .rsplit_once(')')
+            .and_then(|(_, rest)| rest.split_whitespace().nth(1))
+            .and_then(|p| p.parse::<u32>().ok())
+            .unwrap_or(0);
+        if ppid == 0 || ppid == current {
+            break;
+        }
+        current = ppid;
+        depth += 1;
+    }
+    depth
 }
 
 /// Recursively collect all descendant PIDs of a process using /proc/<pid>/task/<pid>/children
@@ -580,6 +716,43 @@ fn parse_tcp_listen_reader<R: BufRead>(
 mod tests {
     use super::*;
     use std::time::Duration;
+
+    #[test]
+    fn test_split_command_tokens_respects_quotes() {
+        let toks = split_command_tokens(r#"aider --model deepseek --msg "hello world" 'x y'"#);
+        assert_eq!(
+            toks,
+            vec!["aider", "--model", "deepseek", "--msg", "hello world", "x y"]
+        );
+    }
+
+    #[test]
+    fn test_resolve_exec_and_args_splits_flags() {
+        let (exe, args) = resolve_exec_and_args(Some("echo hello world"), Vec::new());
+        assert!(exe.ends_with("echo") || exe == "echo");
+        assert_eq!(args, vec!["hello", "world"]);
+    }
+
+    #[test]
+    fn test_resolve_exec_and_args_uses_shell_for_operators() {
+        let (exe, args) = resolve_exec_and_args(Some("echo hello && uname -a"), Vec::new());
+        assert!(exe.contains("sh"), "expected a shell, got {exe}");
+        assert_eq!(args, vec!["-c", "echo hello && uname -a"]);
+    }
+
+    #[test]
+    fn test_resolve_exec_and_args_keeps_explicit_args() {
+        let (_, args) =
+            resolve_exec_and_args(Some("cargo"), vec!["test".to_string(), "--workspace".to_string()]);
+        assert_eq!(args, vec!["test", "--workspace"]);
+    }
+
+    #[test]
+    fn test_resolve_exec_and_args_bare_command() {
+        let (exe, args) = resolve_exec_and_args(Some("bash"), Vec::new());
+        assert!(exe.ends_with("bash") || exe == "bash");
+        assert!(args.is_empty());
+    }
 
     #[tokio::test]
     async fn test_pty_spawn_and_write() -> Result<(), Box<dyn std::error::Error>> {

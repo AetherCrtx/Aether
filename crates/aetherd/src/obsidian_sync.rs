@@ -1,4 +1,5 @@
 use crate::brain_db::{BrainDb, BrainDbError};
+use aether_protocol::ipc::WorkflowDefinition;
 use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use sha2::{Digest, Sha256};
 use std::fs;
@@ -41,6 +42,7 @@ pub struct ObsidianSyncEngine {
     db: BrainDb,
     workspace_id: String,
     vault_path: PathBuf,
+    event_tx: Option<tokio::sync::broadcast::Sender<aether_protocol::ipc::IpcEvent>>,
 }
 
 impl ObsidianSyncEngine {
@@ -49,7 +51,17 @@ impl ObsidianSyncEngine {
             db,
             workspace_id: workspace_id.into(),
             vault_path: vault_path.into(),
+            event_tx: None,
         }
+    }
+
+    /// Attach the daemon event bus so externally edited notes can notify the GUI sidebar.
+    pub fn with_event_tx(
+        mut self,
+        event_tx: tokio::sync::broadcast::Sender<aether_protocol::ipc::IpcEvent>,
+    ) -> Self {
+        self.event_tx = Some(event_tx);
+        self
     }
 
     /// Recursively scan and index every markdown note in the Obsidian Vault
@@ -153,8 +165,16 @@ impl ObsidianSyncEngine {
             }
         }
 
-        // 3. New external edit: re-index into SQLite FTS5
+        // 3. New external edit: re-index into SQLite FTS5 and notify the GUI sidebar
         self.index_single_note(full_path)?;
+
+        if let Some(tx) = &self.event_tx {
+            let _ = tx.send(aether_protocol::ipc::IpcEvent::ObsidianNoteUpdated {
+                workspace_id: self.workspace_id.clone(),
+                relative_path: rel_path,
+            });
+        }
+
         Ok(true)
     }
 
@@ -239,6 +259,109 @@ impl ObsidianSyncEngine {
 
         info!("Obsidian vault watcher active with 75ms debounce on: {}", self.vault_path.display());
         Ok(watcher)
+    }
+
+    /// Load parameterized workflows from `<vault>/Workflows/*.md`.
+    ///
+    /// Frontmatter supplies `id`, `name`, `description`, `tags` (comma separated);
+    /// the first non-empty body line is the command template.
+    pub fn load_workflows(&self) -> Result<Vec<WorkflowDefinition>, ObsidianSyncError> {
+        let dir = self.vault_path.join("Workflows");
+        if !dir.is_dir() {
+            return Ok(Vec::new());
+        }
+
+        let mut workflows = Vec::new();
+        let mut entries: Vec<PathBuf> = match fs::read_dir(&dir) {
+            Ok(rd) => rd.flatten().map(|e| e.path()).collect(),
+            Err(e) => return Err(ObsidianSyncError::Io(e)),
+        };
+        entries.sort();
+
+        for path in entries {
+            if path.extension().and_then(|e| e.to_str()) != Some("md") {
+                continue;
+            }
+            let Ok(content) = fs::read_to_string(&path) else {
+                continue;
+            };
+            let rel_path = path
+                .strip_prefix(&self.vault_path)
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_else(|_| path.to_string_lossy().to_string());
+
+            let (title, frontmatter) = Self::parse_markdown_metadata(&content, &rel_path);
+            let meta: serde_json::Value = frontmatter
+                .and_then(|f| serde_json::from_str(&f).ok())
+                .unwrap_or(serde_json::Value::Null);
+
+            let command_template = Self::workflow_body(&content);
+            if command_template.is_empty() {
+                continue;
+            }
+
+            let str_field = |key: &str| {
+                meta.get(key)
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+            };
+
+            workflows.push(WorkflowDefinition {
+                id: str_field("id").unwrap_or_else(|| {
+                    path.file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("workflow")
+                        .to_string()
+                }),
+                name: str_field("name").unwrap_or(title),
+                description: str_field("description").unwrap_or_default(),
+                command_template,
+                tags: str_field("tags")
+                    .map(|t| {
+                        t.split(',')
+                            .map(|s| s.trim().to_string())
+                            .filter(|s| !s.is_empty())
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+                relative_path: rel_path,
+            });
+        }
+
+        Ok(workflows)
+    }
+
+    /// Command template = first non-empty line after the frontmatter block.
+    /// Files without frontmatter fall back to the first non-empty, non-heading line.
+    fn workflow_body(content: &str) -> String {
+        let mut lines = content.lines();
+        let has_frontmatter = lines.next().map(|l| l.trim() == "---").unwrap_or(false);
+
+        if has_frontmatter {
+            let mut closed = false;
+            for line in content.lines().skip(1) {
+                let t = line.trim();
+                if !closed {
+                    if t == "---" {
+                        closed = true;
+                    }
+                    continue;
+                }
+                if t.is_empty() || t == "---" {
+                    continue;
+                }
+                return t.to_string();
+            }
+            return String::new();
+        }
+
+        content
+            .lines()
+            .map(str::trim)
+            .find(|t| !t.is_empty() && !t.starts_with('#'))
+            .unwrap_or_default()
+            .to_string()
     }
 
     /// Parse YAML frontmatter between `---` fences and determine document title
@@ -415,6 +538,62 @@ fn md5_hash(s: &str) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_load_workflows_reads_vault_markdown() -> Result<(), Box<dyn std::error::Error>> {
+        let temp_dir = std::env::temp_dir()
+            .join(format!("aether_wf_test_{}", uuid::Uuid::new_v4().simple()));
+        let wf_dir = temp_dir.join("Workflows");
+        fs::create_dir_all(&wf_dir)?;
+
+        fs::write(
+            wf_dir.join("cargo-check.md"),
+            "---\nid: wf_cargo_check\nname: Cargo Workspace Check\ndescription: Type-check a crate.\ntags: rust, build\n---\n\ncargo check --package {{crate_name}} --all-targets\n",
+        )?;
+        // No frontmatter: id falls back to the filename stem, name to the H1.
+        fs::write(
+            wf_dir.join("plain.md"),
+            "# Plain Workflow\n\necho plain\n",
+        )?;
+        // Not markdown: must be ignored.
+        fs::write(wf_dir.join("notes.txt"), "ignored")?;
+
+        let db = BrainDb::open_in_memory()?;
+        let engine = ObsidianSyncEngine::new(db, "default", &temp_dir);
+        let workflows = engine.load_workflows()?;
+
+        assert_eq!(workflows.len(), 2, "only the two markdown files count");
+        let cargo = workflows
+            .iter()
+            .find(|w| w.id == "wf_cargo_check")
+            .expect("cargo workflow present");
+        assert_eq!(cargo.command_template, "cargo check --package {{crate_name}} --all-targets");
+        assert_eq!(cargo.tags, vec!["rust", "build"]);
+        assert_eq!(cargo.relative_path, "Workflows/cargo-check.md");
+
+        let plain = workflows
+            .iter()
+            .find(|w| w.id == "plain")
+            .expect("filename stem used as id");
+        assert_eq!(plain.name, "Plain Workflow");
+        assert_eq!(plain.command_template, "echo plain");
+        assert!(plain.tags.is_empty());
+
+        fs::remove_dir_all(&temp_dir)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_load_workflows_missing_dir_is_empty() -> Result<(), Box<dyn std::error::Error>> {
+        let db = BrainDb::open_in_memory()?;
+        let engine = ObsidianSyncEngine::new(
+            db,
+            "default",
+            std::env::temp_dir().join("aether_no_such_vault_xyz"),
+        );
+        assert!(engine.load_workflows()?.is_empty());
+        Ok(())
+    }
 
     #[test]
     fn test_obsidian_frontmatter_and_checkbox_mutation() -> Result<(), Box<dyn std::error::Error>> {

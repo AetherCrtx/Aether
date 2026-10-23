@@ -216,8 +216,9 @@ pub async fn process_event_stream<F>(
                         let buf = pane_buffers.entry(pane_id.clone()).or_default();
                         buf.extend(data);
 
-                        // Adaptive draining: drain any already queued messages
-                        let mut non_pty_events = Vec::new();
+                        // Adaptive draining: drain queued PTY output only. A non-PTY event
+                        // (PaneExited, status change) stops the drain so the main select
+                        // branch handles it and keeps event ordering intact.
                         while let Ok(next_msg) = event_rx.try_recv() {
                             match next_msg {
                                 IpcMessage::Event(IpcEvent::PtyOutput { pane_id: next_id, data: next_data }) => {
@@ -227,27 +228,38 @@ pub async fn process_event_stream<F>(
                                         break;
                                     }
                                 }
-                                IpcMessage::Event(other) => {
-                                    non_pty_events.push(other);
+                                other => {
+                                    // Re-inject by handling inline: flush first, then emit.
+                                    if let IpcMessage::Event(ref ev) = other {
+                                        if let IpcEvent::PaneExited { ref pane_id, .. } = ev {
+                                            if let Some(buf) = pane_buffers.get_mut(pane_id) {
+                                                if !buf.is_empty() {
+                                                    let pty_event = IpcEvent::PtyOutput {
+                                                        pane_id: pane_id.clone(),
+                                                        data: std::mem::take(buf),
+                                                    };
+                                                    emit_fn("aether:event", pty_event);
+                                                }
+                                            }
+                                        }
+                                        emit_fn("aether:event", ev.clone());
+                                    }
+                                    break;
                                 }
-                                _ => {}
                             }
                         }
 
-                        // Flush all pane buffers immediately if channel is now drained or threshold reached
+                        // Contract (see tests): a buffer is flushed only when it reaches
+                        // the chunk threshold, when its pane exits, or when the interval
+                        // timer fires. Draining never flushes on its own.
                         for (pid, p_buf) in pane_buffers.iter_mut() {
-                            if !p_buf.is_empty() {
+                            if p_buf.len() >= chunk_threshold {
                                 let event = IpcEvent::PtyOutput {
                                     pane_id: pid.clone(),
                                     data: std::mem::take(p_buf),
                                 };
                                 emit_fn("aether:event", event);
                             }
-                        }
-
-                        // Emit any non-pty events that were interleaved
-                        for ev in non_pty_events {
-                            emit_fn("aether:event", ev);
                         }
                     }
                     Some(IpcMessage::Event(event)) => {
@@ -400,6 +412,18 @@ pub fn cmd_check_pane_process(pid: u32, cli_type: String) -> Option<String> {
     }
 
     None
+}
+
+#[tauri::command]
+pub async fn cmd_get_scrollback(
+    state: State<'_, GuiBridgeState>,
+    pane_id: String,
+) -> Result<Vec<u8>, String> {
+    let req = IpcRequestPayload::GetScrollback { pane_id };
+    match state.send_request(req).await? {
+        IpcResponsePayload::ScrollbackData { data, .. } => Ok(data),
+        _ => Err("Unexpected response".to_string()),
+    }
 }
 
 #[tauri::command]
@@ -562,6 +586,18 @@ pub async fn cmd_list_snapshots(
     match state.send_request(req).await? {
         IpcResponsePayload::SnapshotList(snaps) => Ok(snaps),
         _ => Err("Unexpected response".to_string()),
+    }
+}
+
+#[tauri::command]
+pub async fn cmd_list_workflows(
+    state: State<'_, GuiBridgeState>,
+    workspace_id: String,
+) -> Result<Vec<aether_protocol::ipc::WorkflowDefinition>, String> {
+    let req = IpcRequestPayload::ListWorkflows { workspace_id };
+    match state.send_request(req).await? {
+        IpcResponsePayload::WorkflowList(list) => Ok(list),
+        _ => Err("Unexpected response for ListWorkflows".to_string()),
     }
 }
 

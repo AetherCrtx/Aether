@@ -38,6 +38,38 @@ export interface AgentPane {
   gitBranch?: string;
   openPorts: number[];
   color: string;
+  lastExitCode?: number | null;
+  viewMode?: 'raw' | 'blocks';
+  inputBarOpen?: boolean;
+  lastCommandFailed?: boolean;
+}
+
+export interface CommandBlock {
+  id: string;
+  paneId: string;
+  command: string;
+  cwd: string;
+  startedAt: number;
+  finishedAt?: number;
+  exitCode?: number | null;
+  outputText: string;
+  isBookmarked?: boolean;
+  isCollapsed?: boolean;
+}
+
+export interface AetherWorkflow {
+  id: string;
+  name: string;
+  description: string;
+  commandTemplate: string;
+  tags: string[];
+  /** Vault-relative markdown path when the workflow came from the vault. */
+  relativePath?: string;
+}
+
+export interface PipelineStage {
+  targetCli: string;
+  prompt: string;
 }
 
 export type LayoutNode =
@@ -168,6 +200,12 @@ let globalState = {
   customToolModalOpen: false,
   activeDiff: null as WorktreeDiff | null,
   snapshots: [] as GitSnapshot[],
+  commandBlocks: [] as CommandBlock[],
+  pipelineQueue: [] as PipelineStage[],
+  pipelineActive: false,
+  workflows: [] as AetherWorkflow[],
+  workflowsModalOpen: false,
+  obsidianRefreshTick: 0,
 };
 
 export async function detectAvailableTools(): Promise<DetectedTool[]> {
@@ -1225,6 +1263,23 @@ export function setupGlobalShortcuts() {
       toggleBackgroundDrawer();
     }
 
+    // Alt+R -> Aether Drive Workflow Palette
+    if (e.altKey && (e.key === 'r' || e.key === 'R')) {
+      e.preventDefault();
+      toggleWorkflowsModal();
+    }
+    // Alt+I -> Toggle Modern Input Bar on active pane
+    if (e.altKey && (e.key === 'i' || e.key === 'I')) {
+      e.preventDefault();
+      if (globalState.activePaneId) {
+        togglePaneInputBar(globalState.activePaneId);
+      }
+    }
+    // Alt+Shift+P -> Advance pending pipeline stage
+    if (e.altKey && e.shiftKey && (e.key === 'p' || e.key === 'P')) {
+      e.preventDefault();
+      advancePipelineStage();
+    }
     // Directional Pane Navigation (Vim keys & Arrows)
     if (e.altKey && !e.shiftKey) {
       if (e.key === 'h' || e.key === 'H' || e.key === 'ArrowLeft') {
@@ -1276,6 +1331,41 @@ export function subscribeAetherEvents(onPtyData?: (paneId: string, bytes: Uint8A
       if (onPtyData) {
         onPtyData(pane_id, new Uint8Array(data));
       }
+      // Attribute output to the pane's active command block (Warp Block View).
+      // Decode only when a block is actually open: decoding + ANSI-stripping every
+      // chunk is the dominant cost on high-throughput output (cargo build, tail -f).
+      if (getOpenCommandBlock(pane_id)) {
+        try {
+          const decoded = new TextDecoder().decode(new Uint8Array(data));
+          appendBlockOutput(pane_id, stripAnsi(decoded));
+        } catch {}
+      }
+    } else if (payload.PaneExited) {
+      const { pane_id, exit_code } = payload.PaneExited;
+      finishCommandBlock(pane_id, exit_code);
+
+      const bg = globalState.backgroundTasks.find((t) => t.id === pane_id);
+      if (bg) {
+        bg.status = exit_code === 0 ? 'EXITED' : 'ERROR';
+      }
+      const p = globalState.panes.find((pane) => pane.id === pane_id);
+      if (p) {
+        p.status = exit_code === 0 ? 'IDLE' : 'ERROR';
+        p.lastExitCode = exit_code;
+      }
+      notify();
+    } else if (payload.DelegationPaneRequested) {
+      const { target_cli, prompt } = payload.DelegationPaneRequested;
+      spawnAgentPane(target_cli, true).then((pane) => {
+        if (pane) {
+          setTimeout(() => {
+            sendPtyInput(pane.id, `${prompt}\n`);
+          }, 600);
+        }
+      });
+    } else if (payload.ObsidianNoteUpdated) {
+      globalState.obsidianRefreshTick += 1;
+      notify();
     } else if (payload.PaneStatusChanged) {
       const { pane_id, status } = payload.PaneStatusChanged;
       const p = globalState.panes.find((pane) => pane.id === pane_id);
@@ -1512,4 +1602,309 @@ export async function releaseModule(agentId: string, files: string[]): Promise<v
       console.error('Failed to release module:', e);
     }
   }
+}
+
+// ----------------------------------------------------------------------------
+// Warp-Style Command Blocks, Scrollback Restoration & Pipeline Orchestration
+// ----------------------------------------------------------------------------
+
+const ANSI_PATTERN = /\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*\x07|\x1b[()][A-Z0-9]/g;
+
+export function stripAnsi(input: string): string {
+  return input.replace(ANSI_PATTERN, '');
+}
+
+export async function getPaneScrollback(paneId: string): Promise<Uint8Array | null> {
+  if (!isRunningInTauri()) return null;
+  try {
+    const bytes = await invoke('cmd_get_scrollback', { paneId });
+    return bytes && bytes.length > 0 ? new Uint8Array(bytes) : null;
+  } catch (e) {
+    console.warn('getPaneScrollback failed:', e);
+    return null;
+  }
+}
+
+export function getPaneBlocks(paneId: string): CommandBlock[] {
+  return globalState.commandBlocks.filter((b) => b.paneId === paneId);
+}
+
+export function startCommandBlock(paneId: string, command: string, cwd?: string): CommandBlock {
+  const pane = globalState.panes.find((p) => p.id === paneId);
+  const block: CommandBlock = {
+    id: `blk_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    paneId,
+    command,
+    cwd: cwd || pane?.worktreePath || '',
+    startedAt: Date.now(),
+    exitCode: null,
+    outputText: '',
+    isBookmarked: false,
+    isCollapsed: false,
+  };
+  globalState.commandBlocks.push(block);
+  if (pane) pane.status = 'EXECUTING';
+  notify();
+  return block;
+}
+
+let lastBlockNotify = 0;
+
+export function getOpenCommandBlock(paneId: string): CommandBlock | undefined {
+  const blocks = globalState.commandBlocks;
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    if (blocks[i].paneId === paneId) {
+      return blocks[i].exitCode === null ? blocks[i] : undefined;
+    }
+  }
+  return undefined;
+}
+
+export function appendBlockOutput(paneId: string, text: string) {
+  const blocks = globalState.commandBlocks;
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    if (blocks[i].paneId === paneId) {
+      // Only a block that is still running owns new output. Appending to a finished
+      // block made the string grow without bound on every chunk.
+      if (blocks[i].exitCode !== null) return;
+      blocks[i].outputText += text;
+      if (blocks[i].outputText.length > 200_000) {
+        blocks[i].outputText = blocks[i].outputText.slice(-200_000);
+      }
+      // Throttle re-renders: output streams at high frequency
+      const now = Date.now();
+      if (now - lastBlockNotify > 250) {
+        lastBlockNotify = now;
+        notify();
+      }
+      return;
+    }
+  }
+}
+
+export function finishCommandBlock(paneId: string, exitCode: number | null) {
+  const blocks = globalState.commandBlocks;
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    if (blocks[i].paneId === paneId && blocks[i].finishedAt === undefined) {
+      blocks[i].finishedAt = Date.now();
+      blocks[i].exitCode = exitCode;
+      const failed = exitCode !== null && exitCode !== 0;
+      const pane = globalState.panes.find((p) => p.id === paneId);
+      if (pane) pane.lastCommandFailed = failed;
+      notify();
+      return;
+    }
+  }
+}
+
+export function toggleBlockBookmark(blockId: string) {
+  const block = globalState.commandBlocks.find((b) => b.id === blockId);
+  if (block) {
+    block.isBookmarked = !block.isBookmarked;
+    notify();
+  }
+}
+
+export function toggleBlockCollapsed(blockId: string) {
+  const block = globalState.commandBlocks.find((b) => b.id === blockId);
+  if (block) {
+    block.isCollapsed = !block.isCollapsed;
+    notify();
+  }
+}
+
+export function setPaneViewMode(paneId: string, mode: 'raw' | 'blocks') {
+  const pane = globalState.panes.find((p) => p.id === paneId);
+  if (pane) {
+    pane.viewMode = mode;
+    notify();
+  }
+}
+
+export function togglePaneInputBar(paneId: string, open?: boolean) {
+  const pane = globalState.panes.find((p) => p.id === paneId);
+  if (pane) {
+    pane.inputBarOpen = open !== undefined ? open : !pane.inputBarOpen;
+    notify();
+  }
+}
+
+export function recentCommandsFor(paneId: string, limit = 20): string[] {
+  return getPaneBlocks(paneId)
+    .map((b) => b.command)
+    .filter((c) => c.trim().length > 0)
+    .slice(-limit)
+    .reverse();
+}
+
+/**
+ * Execute a command through a pane: registers a Command Block, echoes it into the PTY
+ * and records the block as active so output streaming can be attributed to it.
+ */
+export async function executeCommandInPane(paneId: string, command: string) {
+  if (!command.trim()) return;
+  startCommandBlock(paneId, command.trim());
+  await sendPtyInput(paneId, `${command}\n`);
+}
+
+export function dispatchToPeerAgent(command: string, output: string, targetCli?: string) {
+  const target = targetCli || globalState.detectedTools.find((t) => t.category === 'agent')?.id || 'claude-code';
+  const excerpt = output.split('\n').slice(-50).join('\n');
+  const prompt = `Analyze and fix the issue in this command output:\n$ ${command}\n${excerpt}\n`;
+  const existing = globalState.panes.find((p) => p.cliType === target);
+  if (existing) {
+    sendPtyInput(existing.id, prompt);
+    return Promise.resolve(existing);
+  }
+  return spawnAgentPane(target, true).then((pane) => {
+    if (pane) {
+      setTimeout(() => sendPtyInput(pane.id, prompt), 600);
+    }
+    return pane;
+  });
+}
+
+// ------------------------------ Pipeline Queue ------------------------------
+
+export function enqueuePipelineStage(stage: PipelineStage) {
+  globalState.pipelineQueue.push(stage);
+  globalState.pipelineActive = true;
+  notify();
+}
+
+export function clearPipeline() {
+  globalState.pipelineQueue = [];
+  globalState.pipelineActive = false;
+  notify();
+}
+
+export async function advancePipelineStage() {
+  const next = globalState.pipelineQueue.shift();
+  if (!next) {
+    globalState.pipelineActive = false;
+    notify();
+    return;
+  }
+  notify();
+
+  const existing = globalState.panes.find((p) => p.cliType === next.targetCli);
+  if (existing) {
+    await sendPtyInput(existing.id, `${next.prompt}\n`);
+    return;
+  }
+  const created = await spawnAgentPane(next.targetCli, true);
+  if (created) {
+    setTimeout(() => {
+      sendPtyInput(created.id, `${next.prompt}\n`);
+    }, 600);
+  }
+}
+
+// ------------------------------- Workflows ---------------------------------
+
+export const BUILTIN_WORKFLOWS: AetherWorkflow[] = [
+  {
+    id: 'wf_worktree_cleanup',
+    name: 'Git Worktree Cleanup',
+    description: 'Prune stale worktrees and report remaining ones.',
+    commandTemplate: 'git worktree prune && git worktree list',
+    tags: ['git', 'maintenance'],
+  },
+  {
+    id: 'wf_cargo_check',
+    name: 'Cargo Workspace Check',
+    description: 'Type-check every crate in the workspace.',
+    commandTemplate: 'cargo check --package {{crate_name}} --all-targets',
+    tags: ['rust', 'build'],
+  },
+  {
+    id: 'wf_port_kill',
+    name: 'Port Kill by Number',
+    description: 'Free a TCP port held by a lingering process.',
+    commandTemplate: 'fuser -k {{port}}/tcp || lsof -ti tcp:{{port}} | xargs -r kill -9',
+    tags: ['network', 'process'],
+  },
+  {
+    id: 'wf_broadcast_review',
+    name: 'Broadcast Architecture Review',
+    description: 'Ask every active agent to review the current architecture.',
+    commandTemplate: 'echo "Architecture review requested for {{module}}: check boundaries, error handling, and tests."',
+    tags: ['agents', 'review'],
+  },
+  {
+    id: 'wf_docker_logs',
+    name: 'Docker Container Logs',
+    description: 'Tail the last 200 log lines of a container.',
+    commandTemplate: 'docker logs --tail {{lines}} -f {{container}}',
+    tags: ['docker', 'observability'],
+  },
+];
+
+export async function loadWorkflows() {
+  if (globalState.workflows.length === 0) {
+    globalState.workflows = [...BUILTIN_WORKFLOWS];
+    notify();
+  }
+
+  // Vault-backed workflows override built-ins with the same id.
+  if (invoke) {
+    try {
+      const raw: {
+        id: string;
+        name: string;
+        description: string;
+        command_template: string;
+        tags: string[];
+        relative_path: string;
+      }[] = await invoke('cmd_list_workflows', { workspaceId: globalState.workspaceId });
+
+      if (raw && raw.length > 0) {
+        const fromVault: AetherWorkflow[] = raw.map((w) => ({
+          id: w.id,
+          name: w.name,
+          description: w.description,
+          commandTemplate: w.command_template,
+          tags: w.tags,
+          relativePath: w.relative_path,
+        }));
+        const byId = new Map(fromVault.map((w) => [w.id, w]));
+        const merged = [
+          ...fromVault,
+          ...BUILTIN_WORKFLOWS.filter((b) => !byId.has(b.id)),
+        ];
+        globalState.workflows = merged;
+        notify();
+      }
+    } catch (e) {
+      console.warn('Vault workflow load failed, using built-ins:', e);
+    }
+  }
+
+  return globalState.workflows;
+}
+
+export function toggleWorkflowsModal(open?: boolean) {
+  globalState.workflowsModalOpen = open !== undefined ? open : !globalState.workflowsModalOpen;
+  if (globalState.workflowsModalOpen) {
+    // Fire and forget: built-ins show immediately, vault entries merge in after.
+    void loadWorkflows();
+  }
+  notify();
+}
+
+export function extractWorkflowParams(template: string): string[] {
+  const matches = template.matchAll(/\{\{\s*([\w.-]+)\s*\}\}/g);
+  return Array.from(new Set(Array.from(matches, (m) => m[1])));
+}
+
+export function renderWorkflowTemplate(template: string, values: Record<string, string>): string {
+  return template.replace(/\{\{\s*([\w.-]+)\s*\}\}/g, (_, key: string) => values[key] ?? '');
+}
+
+export async function runWorkflow(template: string, values: Record<string, string>, paneId?: string) {
+  const targetPane = paneId || globalState.activePaneId;
+  if (!targetPane) return false;
+  const command = renderWorkflowTemplate(template, values);
+  await executeCommandInPane(targetPane, command);
+  return true;
 }

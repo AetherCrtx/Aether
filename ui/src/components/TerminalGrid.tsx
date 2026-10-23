@@ -9,9 +9,14 @@ import {
   setDefaultShell,
   toggleCustomToolModal,
   updateSplitRatio,
+  togglePaneInputBar,
 } from '../stores/aetherStore';
 import { AgentHeaderPill } from './AgentHeaderPill';
 import { XtermWebGLPane } from './XtermWebGLPane';
+import { CommandBlocksOverlay } from './CommandBlocksOverlay';
+import { ModernInputBar } from './ModernInputBar';
+import { ErrorRecoveryBanner } from './ErrorRecoveryBanner';
+import { getPaneBlocks } from '../stores/aetherStore';
 import { Terminal, Plus, Sparkles, Command } from 'lucide-react';
 
 interface Props {
@@ -155,13 +160,30 @@ export const TerminalGrid: React.FC<Props> = ({ registerTermWriter }) => {
           className="w-full h-full flex flex-col bg-tokyo-bgDark border border-tokyo-border/70 overflow-hidden shadow-inner"
         >
           <AgentHeaderPill pane={pane} isActive={isActive} />
-          <div className="flex-1 w-full relative">
-            <XtermWebGLPane
-              paneId={pane.id}
-              isActive={isActive}
-              onFocus={() => setActivePane(pane.id)}
-              registerTermWriter={registerTermWriter}
-            />
+          <div className="flex-1 w-full relative flex flex-col min-h-0">
+            <div className="flex-1 w-full relative min-h-0">
+              {pane.viewMode === 'blocks' ? (
+                <CommandBlocksOverlay paneId={pane.id} blocks={getPaneBlocks(pane.id)} />
+              ) : (
+                <XtermWebGLPane
+                  paneId={pane.id}
+                  isActive={isActive}
+                  onFocus={() => setActivePane(pane.id)}
+                  registerTermWriter={registerTermWriter}
+                />
+              )}
+            </div>
+            <ErrorRecoveryBanner pane={pane} />
+            {pane.inputBarOpen && (
+              <ModernInputBar
+                paneId={pane.id}
+                cliType={pane.cliType}
+                isAgentPane={
+                  (AGENT_PALETTES[pane.cliType]?.category ?? 'agent') === 'agent'
+                }
+                onClose={() => togglePaneInputBar(pane.id, false)}
+              />
+            )}
           </div>
         </div>
       );

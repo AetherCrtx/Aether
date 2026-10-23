@@ -3,7 +3,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { ImageAddon } from '@xterm/addon-image';
-import { resizePanePty, sendPtyInput } from '../stores/aetherStore';
+import { resizePanePty, sendPtyInput, getPaneScrollback } from '../stores/aetherStore';
 
 interface Props {
   paneId: string;
@@ -33,6 +33,8 @@ export const XtermWebGLPane: React.FC<Props> = ({
       fontFamily: '"JetBrainsMono Nerd Font", "FiraCode Nerd Font", monospace',
       lineHeight: 1.25,
       allowTransparency: true,
+      // Cap scrollback: unbounded buffers are the main memory/lag source on long sessions.
+      scrollback: 5000,
       theme: {
         background: '#16161e00', // Transparent for Wayland compositor
         foreground: '#c0caf5',
@@ -206,10 +208,38 @@ export const XtermWebGLPane: React.FC<Props> = ({
       }
     };
 
+    let disposed = false;
+    // Live bytes arriving while scrollback is still in flight must wait, otherwise the
+    // snapshot is appended after them and the same lines render twice.
+    let scrollbackRestored = false;
+    const preRestoreQueue: (Uint8Array | string)[] = [];
+
     // Register writer so incoming aetherd PTY events write to this terminal via RAF queue
     const unregister = registerTermWriter(paneId, (data) => {
+      if (!scrollbackRestored) {
+        preRestoreQueue.push(data);
+        return;
+      }
       chunkQueue.push(data);
       scheduleFlush();
+    });
+
+    // 5. Restore scrollback history (512 KB ring buffer in aetherd) before live output
+    getPaneScrollback(paneId).then((bytes) => {
+      if (disposed) return;
+      if (bytes && bytes.length > 0) {
+        term.write(bytes);
+      }
+    }).catch(() => {}).finally(() => {
+      if (disposed) return;
+      scrollbackRestored = true;
+      for (const chunk of preRestoreQueue) {
+        chunkQueue.push(chunk);
+      }
+      preRestoreQueue.length = 0;
+      if (chunkQueue.length > 0) {
+        scheduleFlush();
+      }
     });
 
     // Resize observer
@@ -221,6 +251,7 @@ export const XtermWebGLPane: React.FC<Props> = ({
     }
 
     return () => {
+      disposed = true;
       if (rafId !== null) {
         cancelAnimationFrame(rafId);
         rafId = null;

@@ -36,6 +36,11 @@ async fn test_mcp_server_tools_flow() -> Result<(), Box<dyn std::error::Error>> 
         db: db.clone(),
         pty_manager,
         event_tx,
+        obsidian_sync: Arc::new(aetherd::obsidian_sync::ObsidianSyncEngine::new(
+            db.clone(),
+            "ws_test",
+            temp_dir.join("test_vault_mcp"),
+        )),
     };
 
     let listener = UnixListener::bind(&socket_path)?;

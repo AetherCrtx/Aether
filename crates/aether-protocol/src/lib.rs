@@ -45,7 +45,7 @@ mod tests {
     #[test]
     fn test_mcp_tools_catalog() {
         let tools = all_aether_mcp_tools();
-        assert_eq!(tools.len(), 7);
+        assert_eq!(tools.len(), 9);
         let names: Vec<_> = tools.iter().map(|t| t.name.as_str()).collect();
         assert!(names.contains(&"aether_get_shared_context"));
         assert!(names.contains(&"aether_claim_module"));
@@ -54,5 +54,18 @@ mod tests {
         assert!(names.contains(&"obsidian_read_note"));
         assert!(names.contains(&"obsidian_update_task"));
         assert!(names.contains(&"obsidian_append_memory"));
+        assert!(names.contains(&"aether_release_module"));
+        assert!(names.contains(&"aether_create_snapshot"));
+    }
+
+    #[test]
+    fn test_release_and_snapshot_args_deserialize() {
+        let rel: ReleaseModuleArgs =
+            serde_json::from_str(r#"{"files":["src/a.rs","src/b.rs"]}"#).unwrap();
+        assert_eq!(rel.files.len(), 2);
+
+        let snap: CreateSnapshotArgs =
+            serde_json::from_str(r#"{"summary":"Before refactor"}"#).unwrap();
+        assert_eq!(snap.summary, "Before refactor");
     }
 }

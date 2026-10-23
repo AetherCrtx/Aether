@@ -35,6 +35,30 @@ fn resolve_default_vault_path() -> PathBuf {
     }
 }
 
+/// Pick the working directory for a new pane.
+///
+/// Priority: explicit request → workspace repo root → `/`. Never `$HOME`: a fresh
+/// pane used to land in the user's home directory because that was the fallback.
+fn resolve_spawn_working_dir(
+    requested: &Path,
+    workspace_root: Option<PathBuf>,
+    home_dir: &Path,
+) -> PathBuf {
+    let dir = if !requested.as_os_str().is_empty() && requested != Path::new(".") {
+        requested.to_path_buf()
+    } else {
+        match workspace_root {
+            Some(root) if root.exists() && root != home_dir => root,
+            _ => PathBuf::from("/"),
+        }
+    };
+    if dir.exists() {
+        dir
+    } else {
+        PathBuf::from("/")
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 1. Initialize Logging
@@ -82,11 +106,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Clear stale agent instances from previous daemon lifecycles
     let _ = db.clear_all_agent_instances();
 
-    let obsidian_sync = Arc::new(ObsidianSyncEngine::new(db.clone(), "default", &default_vault));
+    // Event bus must exist before the Obsidian engine so note updates reach the GUI
+    let (event_tx, _) = broadcast::channel::<IpcEvent>(2048);
+
+    let obsidian_sync = Arc::new(
+        ObsidianSyncEngine::new(db.clone(), "default", &default_vault)
+            .with_event_tx(event_tx.clone()),
+    );
     if let Err(e) = obsidian_sync.index_entire_vault() {
         warn!("Failed to index default obsidian vault: {}", e);
     }
-    let _obsidian_watcher = match obsidian_sync.start_watcher() {
+    let _obsidian_watcher = match obsidian_sync.clone().start_watcher() {
         Ok(w) => {
             info!("Obsidian vault file watcher started on {}", default_vault.display());
             Some(w)
@@ -97,14 +127,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    // 4. Initialize PTY Manager and Event Bus
-    let (event_tx, _) = broadcast::channel::<IpcEvent>(2048);
+    // 4. Initialize PTY Manager (event bus created above for Obsidian sync)
     let pty_manager = Arc::new(PtyManager::new(event_tx.clone()));
 
     let ctx = DaemonContext {
         db,
         pty_manager: pty_manager.clone(),
         event_tx: event_tx.clone(),
+        obsidian_sync: obsidian_sync.clone(),
     };
 
     // 5. Clean up stale socket file if necessary
@@ -291,22 +321,37 @@ async fn process_request(ctx: &DaemonContext, req: IpcRequest) -> IpcResponse {
                 );
             }
 
-            // Determine target working directory:
-            // 1. Explicit working_dir in request (if not empty and not ".")
-            // 2. Current working directory of workspace if valid and existing
-            // 3. User's home directory ($HOME)
-            let target_dir = if !spawn_req.working_dir.as_os_str().is_empty() && spawn_req.working_dir != PathBuf::from(".") {
-                spawn_req.working_dir.clone()
-            } else if let Ok(Some(ws)) = ctx.db.get_workspace(&ws_id) {
-                let ws_path = PathBuf::from(ws.root_repo_path);
-                if ws_path.exists() && ws_path != home_dir {
-                    ws_path
-                } else {
-                    home_dir.clone()
+            // Determine target working directory (explicit request → repo root → `/`).
+            let ws_root = ctx.db.get_workspace(&ws_id).ok().flatten().map(|ws| PathBuf::from(ws.root_repo_path));
+            let target_dir = resolve_spawn_working_dir(&spawn_req.working_dir, ws_root, &home_dir);
+
+            // Keep the workspace pointed at the real project repository so WorktreeDiff and
+            // MergeWorktree never fall back to $HOME.
+            if let Some(repo_root) = discover_repo_root(&target_dir) {
+                let repo_root_str = repo_root.to_string_lossy().to_string();
+                let needs_update = match ctx.db.get_workspace(&ws_id) {
+                    Ok(Some(ws)) => ws.root_repo_path != repo_root_str,
+                    _ => true,
+                };
+                if needs_update {
+                    let existing = ctx.db.get_workspace(&ws_id).ok().flatten();
+                    let name = existing
+                        .as_ref()
+                        .map(|w| w.name.clone())
+                        .unwrap_or_else(|| ws_id.clone());
+                    let vault = existing.and_then(|w| w.obsidian_vault_path);
+                    let _ = ctx.db.upsert_workspace(
+                        &ws_id,
+                        &name,
+                        &repo_root_str,
+                        vault.as_deref(),
+                    );
+                    info!(
+                        "Workspace '{}' root_repo_path updated to active repository: {}",
+                        ws_id, repo_root_str
+                    );
                 }
-            } else {
-                home_dir.clone()
-            };
+            }
 
             let (working_dir, worktree_path_opt, git_branch_opt) = if spawn_req.isolated_worktree {
                 match WorktreeEngine::create_worktree(&target_dir, &pane_id, None) {
@@ -522,6 +567,16 @@ async fn process_request(ctx: &DaemonContext, req: IpcRequest) -> IpcResponse {
             }
         }
 
+        IpcRequestPayload::GetScrollback { pane_id } => {
+            match ctx.pty_manager.get_scrollback(&pane_id).await {
+                Ok(data) => IpcResponse::ok(
+                    req_id,
+                    IpcResponsePayload::ScrollbackData { pane_id, data },
+                ),
+                Err(e) => IpcResponse::err(req_id, "PTY_SCROLLBACK_FAILED", e.to_string()),
+            }
+        }
+
         IpcRequestPayload::InitWorkspace(init_req) => {
             let root_str = init_req.root_repo_path.to_string_lossy();
             let vault_str = init_req.obsidian_vault_path.as_ref().map(|p| p.to_string_lossy());
@@ -693,9 +748,17 @@ async fn process_request(ctx: &DaemonContext, req: IpcRequest) -> IpcResponse {
                     }
                 }
             } else {
+                // Interactive pane mode: ask the GUI to spawn a real pane and pipe the prompt in.
+                let _ = ctx.event_tx.send(IpcEvent::DelegationPaneRequested {
+                    workspace_id: del_req.workspace_id.clone(),
+                    caller_agent_id: del_req.caller_agent_id.clone(),
+                    target_cli: del_req.target_cli.clone(),
+                    prompt: del_req.prompt.clone(),
+                });
+
                 let entry_id_str = entry.map(|e| format!("#{}", e.id)).unwrap_or_else(|_| "new".to_string());
                 let result_output = format!(
-                    "Task delegation to @{} registered on shared blackboard ({}) in interactive pane mode.",
+                    "Task delegation to @{} registered on shared blackboard ({}) and an interactive pane was requested in the GUI.",
                     del_req.target_cli, entry_id_str
                 );
                 IpcResponse::ok(req_id, IpcResponsePayload::TaskDelegated { result_output })
@@ -804,6 +867,11 @@ async fn process_request(ctx: &DaemonContext, req: IpcRequest) -> IpcResponse {
             }
         }
 
+        IpcRequestPayload::ListWorkflows { .. } => {
+            let workflows = ctx.obsidian_sync.load_workflows().unwrap_or_default();
+            IpcResponse::ok(req_id, IpcResponsePayload::WorkflowList(workflows))
+        }
+
         IpcRequestPayload::WorktreeDiff(diff_req) => {
             let agent = match ctx.db.get_agent_instance(&diff_req.pane_id) {
                 Ok(Some(a)) => a,
@@ -814,8 +882,12 @@ async fn process_request(ctx: &DaemonContext, req: IpcRequest) -> IpcResponse {
                 _ => return IpcResponse::err(req_id, "WORKSPACE_NOT_FOUND", "Workspace not found"),
             };
 
+            // Prefer the worktree's own repository; fall back to the workspace record.
+            let repo_root =
+                resolve_repo_root_for_pane(agent.worktree_path.as_deref(), &ws.root_repo_path);
+
             match WorktreeEngine::compute_worktree_diff(
-                Path::new(&ws.root_repo_path),
+                &repo_root,
                 &diff_req.pane_id,
                 diff_req.target_branch.as_deref(),
             ) {
@@ -835,8 +907,11 @@ async fn process_request(ctx: &DaemonContext, req: IpcRequest) -> IpcResponse {
             };
 
             let target = merge_req.target_branch.unwrap_or_else(|| "master".to_string());
+            let repo_root =
+                resolve_repo_root_for_pane(agent.worktree_path.as_deref(), &ws.root_repo_path);
+
             match WorktreeEngine::merge_worktree(
-                Path::new(&ws.root_repo_path),
+                &repo_root,
                 &merge_req.pane_id,
                 &target,
                 merge_req.squash,
@@ -964,6 +1039,24 @@ async fn process_request(ctx: &DaemonContext, req: IpcRequest) -> IpcResponse {
     }
 }
 
+/// Discover the root working directory of the Git repository containing `start`.
+fn discover_repo_root(start: &Path) -> Option<PathBuf> {
+    let repo = git2::Repository::discover(start).ok()?;
+    repo.workdir()
+        .map(|p| p.to_path_buf())
+        .or_else(|| Some(repo.path().to_path_buf()))
+}
+
+/// Resolve the repository root for a pane, preferring the worktree's parent repository.
+fn resolve_repo_root_for_pane(worktree_path: Option<&str>, fallback: &str) -> PathBuf {
+    if let Some(wt) = worktree_path {
+        if let Some(root) = discover_repo_root(Path::new(wt)) {
+            return root;
+        }
+    }
+    PathBuf::from(fallback)
+}
+
 /// Determine location of Unix Domain Socket
 fn resolve_socket_path() -> PathBuf {
     if let Ok(path) = std::env::var("AETHER_SOCK").or_else(|_| std::env::var(AETHER_SOCK_ENV)) {
@@ -1054,4 +1147,43 @@ fn resolve_mcp_binary_path() -> PathBuf {
         }
     }
     PathBuf::from("aether-mcp")
+}
+
+#[cfg(test)]
+mod spawn_fallback_tests {
+    use super::resolve_spawn_working_dir;
+    use std::path::{Path, PathBuf};
+
+    fn home() -> PathBuf { PathBuf::from("/home/tester") }
+
+    #[test]
+    fn fresh_pane_defaults_to_filesystem_root_not_home() {
+        // Regression: a brand-new pane used to land in $HOME.
+        let got = resolve_spawn_working_dir(Path::new(""), None, &home());
+        assert_eq!(got, PathBuf::from("/"));
+    }
+
+    #[test]
+    fn workspace_root_wins_when_it_exists() {
+        let got = resolve_spawn_working_dir(Path::new(""), Some(PathBuf::from("/tmp")), &home());
+        assert_eq!(got, PathBuf::from("/tmp"));
+    }
+
+    #[test]
+    fn workspace_root_equal_to_home_falls_back_to_root() {
+        let got = resolve_spawn_working_dir(Path::new(""), Some(home()), &home());
+        assert_eq!(got, PathBuf::from("/"));
+    }
+
+    #[test]
+    fn explicit_request_wins_over_everything() {
+        let got = resolve_spawn_working_dir(Path::new("/usr"), Some(home()), &home());
+        assert_eq!(got, PathBuf::from("/usr"));
+    }
+
+    #[test]
+    fn missing_requested_path_falls_back_to_root() {
+        let got = resolve_spawn_working_dir(Path::new("/nope/does/not/exist"), None, &home());
+        assert_eq!(got, PathBuf::from("/"));
+    }
 }

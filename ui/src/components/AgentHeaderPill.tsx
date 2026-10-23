@@ -5,8 +5,21 @@ import {
   sendPaneToBackground,
   openDiffGatekeeper,
   splitActivePane,
+  setPaneViewMode,
+  togglePaneInputBar,
 } from '../stores/aetherStore';
-import { GitBranch, Radio, SplitSquareVertical, SplitSquareHorizontal, X, ShieldCheck, ArrowDownToLine } from 'lucide-react';
+import {
+  GitBranch,
+  Radio,
+  SplitSquareVertical,
+  SplitSquareHorizontal,
+  X,
+  ShieldCheck,
+  ArrowDownToLine,
+  ListTree,
+  Terminal as TerminalIcon,
+  TextCursorInput,
+} from 'lucide-react';
 
 interface Props {
   pane: AgentPane;
@@ -98,6 +111,41 @@ export const AgentHeaderPill: React.FC<Props> = ({ pane, isActive }) => {
 
       {/* Right: Actions */}
       <div className="flex items-center gap-1">
+        <div className="flex items-center rounded border border-tokyo-border/70 overflow-hidden mr-1">
+          <button
+            onClick={() => setPaneViewMode(pane.id, 'raw')}
+            title="Raw Terminal View"
+            className={`px-1.5 py-1 transition-colors ${
+              pane.viewMode !== 'blocks'
+                ? 'bg-tokyo-blue/20 text-tokyo-blue'
+                : 'text-tokyo-comment hover:text-tokyo-fg'
+            }`}
+          >
+            <TerminalIcon className="w-3 h-3" />
+          </button>
+          <button
+            onClick={() => setPaneViewMode(pane.id, 'blocks')}
+            title="Warp Block View"
+            className={`px-1.5 py-1 transition-colors ${
+              pane.viewMode === 'blocks'
+                ? 'bg-tokyo-purple/20 text-tokyo-purple'
+                : 'text-tokyo-comment hover:text-tokyo-fg'
+            }`}
+          >
+            <ListTree className="w-3 h-3" />
+          </button>
+        </div>
+        <button
+          onClick={() => togglePaneInputBar(pane.id)}
+          title="Toggle Modern Input Bar (Alt+I)"
+          className={`p-1 rounded transition-colors ${
+            pane.inputBarOpen
+              ? 'text-cyan-300 bg-cyan-500/10'
+              : 'text-tokyo-comment hover:text-cyan-300 hover:bg-tokyo-border/50'
+          }`}
+        >
+          <TextCursorInput className="w-3.5 h-3.5" />
+        </button>
         <button
           onClick={() => sendPaneToBackground(pane.id)}
           title="Send to Background (Alt+B)"
