@@ -16,6 +16,7 @@ import {
   spawnAgentPane,
   setDefaultShell,
   toggleCustomToolModal,
+  toggleSidebarMinimized,
   isRunningInTauri,
   AGENT_PALETTES,
 } from '../stores/aetherStore';
@@ -39,6 +40,8 @@ import {
   Search,
   SunMedium,
   Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 
 export interface TopBarProps {
@@ -116,7 +119,19 @@ export const TopBar: React.FC<TopBarProps> = ({
       data-testid="top-bar"
     >
       {/* Left: Terminal Tab Buttons directly matching reference design */}
-      <div className="flex items-center min-w-0 flex-1 mr-4" data-testid="topbar-tabs-container">
+      <div className="flex items-center min-w-0 flex-1 mr-4 gap-1.5" data-testid="topbar-tabs-container">
+        <button
+          onClick={() => toggleSidebarMinimized()}
+          className="p-1 text-cortex-textMuted hover:text-cortex-accent hover:bg-cortex-surface2 rounded transition-colors shrink-0"
+          title={store.sidebarMinimized ? 'Expand Sidebar' : 'Minimize Sidebar'}
+          data-testid="btn-topbar-toggle-sidebar"
+        >
+          {store.sidebarMinimized ? (
+            <PanelLeftOpen className="w-4 h-4 text-cortex-accent" />
+          ) : (
+            <PanelLeftClose className="w-4 h-4" />
+          )}
+        </button>
         <ChromeHeaderTabs />
       </div>
 

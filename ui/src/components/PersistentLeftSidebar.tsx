@@ -52,31 +52,21 @@ import {
 
 export const AetherCortexLogo: React.FC<{ className?: string }> = ({ className = 'w-8 h-8' }) => (
   <svg
-    viewBox="0 0 120 120"
+    viewBox="0 0 100 100"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     className={`${className} shrink-0 select-none filter drop-shadow-[0_0_8px_rgba(0,240,255,0.4)]`}
-    aria-label="AetherCortex Logo"
+    aria-label="AetherCortex Terminal Logo"
   >
-    {/* Bold Geometric Terminal Letter A */}
-    <path
-      d="M60 14L20 98H39L48 78H72L81 98H100L60 14ZM54.5 63L60 47L65.5 63H54.5Z"
-      fill="#FFFFFF"
-    />
-    {/* Vibrant Cosmic Cyan Orbit Ribbon Swoosh wrapping through the A */}
-    <path
-      d="M8 76C12 63 26 51 47 45C45 48 44 50 44 52C26 57 16 66 15 73C14 80 20 86 34 89C54 94 82 91 106 78C112 75 116 70 118 66C116 71 109 77 101 81C76 94 46 96 26 91C13 88 7 82 8 76Z"
-      fill="#00F0FF"
-    />
-    <path
-      d="M15 73C23 57 51 43 85 32C101 27 113 26 118 28C117 33 111 37 104 40C75 50 49 64 43 78C42 75 43 71 46 67C54 54 80 41 108 32C112 30 115 28 116 26C110 24 98 25 82 30C50 40 25 54 18 70C16 74 15 77 15 73Z"
-      fill="#38F4FF"
-    />
-    {/* 4-Pointed Sparkle Star at the upper-right apex */}
-    <path
-      d="M106 18L108 26L116 28L108 30L106 38L104 30L96 28L104 26L106 18Z"
-      fill="#00F0FF"
-    />
+    {/* Terminal Window Frame */}
+    <rect x="8" y="14" width="84" height="72" rx="10" fill="#0E1418" stroke="#00F0FF" strokeWidth="3" />
+    <line x1="8" y1="34" x2="92" y2="34" stroke="#162026" strokeWidth="2" />
+    <circle cx="22" cy="24" r="3.5" fill="#FF3B5C" />
+    <circle cx="34" cy="24" r="3.5" fill="#FFB800" />
+    <circle cx="46" cy="24" r="3.5" fill="#00E599" />
+    {/* Terminal Command Prompt >_ */}
+    <path d="M26 48L42 60L26 72" stroke="#00F0FF" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" />
+    <line x1="48" y1="72" x2="72" y2="72" stroke="#00F0FF" strokeWidth="4.5" strokeLinecap="round" />
   </svg>
 );
 
@@ -803,8 +793,8 @@ export const PersistentLeftSidebar: React.FC<PersistentLeftSidebarProps> = ({
     (!isWorkspaceActive && !isAssistantActive && !isSettingsActive);
 
   const isMinimized = store.sidebarMinimized;
-  // Sidebar expands when Workspace is active to show Drive content, collapses to w-16 when minimized
-  const sidebarWidth = isWorkspaceActive ? 'w-72' : isMinimized ? 'w-16' : 'w-[200px]';
+  // Sidebar collapses to w-16 when minimized; when expanded, it is w-72 if Workspace is active or w-[200px] default
+  const sidebarWidth = isMinimized ? 'w-16' : isWorkspaceActive ? 'w-72' : 'w-[200px]';
 
   const handleNavClick = (section: 'terminal' | 'assistant' | 'workspace' | 'settings') => {
     if (onSelectSection) onSelectSection(section);
@@ -829,7 +819,7 @@ export const PersistentLeftSidebar: React.FC<PersistentLeftSidebarProps> = ({
     >
       {/* Brand Header */}
       {isMinimized ? (
-        <div className="py-4 px-2 flex flex-col items-center justify-center gap-2 border-b border-cortex-border shrink-0">
+        <div className="py-3 px-2 flex flex-col items-center justify-center gap-2 border-b border-cortex-border shrink-0">
           <button
             onClick={() => toggleSidebarMinimized(false)}
             className="hover:scale-105 transition-transform cursor-pointer"
@@ -840,26 +830,33 @@ export const PersistentLeftSidebar: React.FC<PersistentLeftSidebarProps> = ({
           </button>
           <button
             onClick={() => toggleSidebarMinimized(false)}
-            className="p-1 text-cortex-textMuted hover:text-cortex-accent transition-colors"
+            className="p-1 text-cortex-textMuted hover:text-cortex-accent hover:bg-cortex-surface2 rounded transition-colors"
             title="Expand Sidebar"
           >
-            <ChevronRight className="w-3.5 h-3.5" />
+            <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       ) : (
-        <div className="py-5 px-3 flex flex-col items-center justify-center relative border-b border-cortex-border shrink-0">
+        <div className="py-3.5 px-3 flex items-center justify-between border-b border-cortex-border shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <AetherCortexLogo className="w-8 h-8" />
+            <div className="flex flex-col min-w-0">
+              <span className="font-bold text-sm tracking-tight text-cortex-text truncate">
+                AetherCortex
+              </span>
+              <span className="text-[10px] text-cortex-textMuted font-mono truncate">
+                {isWorkspaceActive ? 'Workspace Drive' : 'Terminal Studio'}
+              </span>
+            </div>
+          </div>
           <button
             onClick={() => toggleSidebarMinimized(true)}
-            className="absolute right-2 top-2 p-1 text-cortex-textMuted hover:text-cortex-accent transition-colors rounded hover:bg-cortex-surface2"
+            className="p-1.5 text-cortex-textMuted hover:text-cortex-accent hover:bg-cortex-surface2 rounded transition-colors shrink-0"
             title="Minimize Sidebar"
             data-testid="btn-minimize-sidebar"
           >
-            <ChevronLeft className="w-3.5 h-3.5" />
+            <ChevronLeft className="w-4 h-4" />
           </button>
-          <AetherCortexLogo className="w-12 h-12 mb-1" />
-          <span className="font-bold text-sm tracking-tight text-cortex-text">
-            AetherCortex
-          </span>
         </div>
       )}
 
@@ -908,8 +905,13 @@ export const PersistentLeftSidebar: React.FC<PersistentLeftSidebarProps> = ({
         {/* Workspace */}
         <button
           onClick={() => {
-            if (isMinimized) toggleSidebarMinimized(false);
-            handleNavClick('workspace');
+            if (isMinimized) {
+              toggleSidebarMinimized(false);
+              toggleAetherDriveSidebar(true);
+              if (onSelectSection) onSelectSection('workspace');
+            } else {
+              handleNavClick('workspace');
+            }
           }}
           className={`relative flex items-center transition-colors text-left rounded-none ${
             isMinimized ? 'w-10 h-10 justify-center' : 'w-full gap-3 px-3 py-2.5 text-xs font-medium'
@@ -956,34 +958,42 @@ export const PersistentLeftSidebar: React.FC<PersistentLeftSidebarProps> = ({
         </button>
       </nav>
 
-      {/* Workspace Drive content — inline when active */}
-      {isWorkspaceActive && (
+      {/* Workspace Drive content — inline when active and not minimized */}
+      {!isMinimized && isWorkspaceActive && (
         <div className="flex-1 min-h-0 overflow-hidden border-t border-cortex-border">
           <WorkspaceDrivePanel />
         </div>
       )}
 
-      {/* Bottom Branding */}
-      {!isWorkspaceActive && (
-        <div className={`mt-auto border-t border-cortex-border ${isMinimized ? 'p-2 flex flex-col items-center' : 'p-4'}`}>
-          {!isMinimized && (
-            <div className="flex items-start gap-2.5 mb-3">
-              <span className="w-[2px] h-7 bg-cortex-accent shrink-0 rounded-none" />
-              <div className="flex flex-col text-[9px] font-bold uppercase tracking-wider text-cortex-textMuted leading-tight select-none">
-                <span>BETTER TOOLS.</span>
-                <span>BIGGER POSSIBILITIES.</span>
-              </div>
+      {/* Bottom Branding & Toggle */}
+      <div className={`mt-auto border-t border-cortex-border ${isMinimized ? 'p-2 flex flex-col items-center gap-2' : 'p-3 flex items-center justify-between'}`}>
+        {!isMinimized && (
+          <div className="flex items-center gap-2 select-none min-w-0">
+            <span className="w-[2px] h-6 bg-cortex-accent shrink-0" />
+            <div className="flex flex-col text-[8px] font-bold uppercase tracking-wider text-cortex-textMuted leading-tight truncate">
+              <span>BETTER TOOLS.</span>
+              <span>BIGGER POSSIBILITIES.</span>
             </div>
-          )}
-          {/* 3 Angled Cyan Blocks matching Image 2 */}
-          <div className={`flex items-center gap-1.5 ${isMinimized ? 'py-1 justify-center' : 'pt-2 border-t border-cortex-border pl-1'}`}>
-            <span className="w-3.5 h-4 bg-cortex-accent -skew-x-[24deg] shadow-[0_0_8px_rgba(0,240,255,0.4)]" />
-            <span className="w-3.5 h-4 bg-cortex-accent -skew-x-[24deg] shadow-[0_0_8px_rgba(0,240,255,0.4)]" />
-            <span className="w-3.5 h-4 bg-cortex-accent -skew-x-[24deg] shadow-[0_0_8px_rgba(0,240,255,0.4)]" />
+          </div>
+        )}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* 3 Angled Cyan Blocks */}
+          <div className="flex items-center gap-1">
+            <span className="w-2.5 h-3.5 bg-cortex-accent -skew-x-[24deg] shadow-[0_0_6px_rgba(0,240,255,0.4)]" />
+            <span className="w-2.5 h-3.5 bg-cortex-accent -skew-x-[24deg] shadow-[0_0_6px_rgba(0,240,255,0.4)]" />
+            <span className="w-2.5 h-3.5 bg-cortex-accent -skew-x-[24deg] shadow-[0_0_6px_rgba(0,240,255,0.4)]" />
             <span className="sr-only">///</span>
           </div>
+          <button
+            onClick={() => toggleSidebarMinimized(!isMinimized)}
+            className="p-1 text-cortex-textMuted hover:text-cortex-accent hover:bg-cortex-surface2 rounded transition-colors ml-1"
+            title={isMinimized ? 'Expand Sidebar' : 'Minimize Sidebar'}
+            aria-label={isMinimized ? 'Expand Sidebar' : 'Minimize Sidebar'}
+          >
+            {isMinimized ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
+          </button>
         </div>
-      )}
+      </div>
     </aside>
   );
 };

@@ -72,6 +72,7 @@ const {
   toggleSidebar,
   toggleAetherDriveSidebar,
   toggleAiAssistant,
+  toggleSidebarMinimized,
   setAetherTheme,
   getAetherState,
 } = aetherStore;
@@ -257,4 +258,31 @@ describe('Milestone 1: Brand Identity, Design Tokens & Persistent Sidebar Unit T
       }
     });
   });
+
+  describe('6. Persistent Left Sidebar Minimization & Collapse Tests', () => {
+    it('verifies sidebar minimize and expand controls in PersistentLeftSidebar and TopBar', () => {
+      const sidebarPath = path.resolve(__dirname, '../src/components/PersistentLeftSidebar.tsx');
+      const topBarPath = path.resolve(__dirname, '../src/components/TopBar.tsx');
+      const sidebarContent = fs.readFileSync(sidebarPath, 'utf8');
+      const topBarContent = fs.readFileSync(topBarPath, 'utf8');
+
+      assert.ok(sidebarContent.includes('data-testid="btn-minimize-sidebar"'), 'Must have minimize button');
+      assert.ok(sidebarContent.includes('data-testid="btn-expand-sidebar"'), 'Must have expand button');
+      assert.ok(sidebarContent.includes("isMinimized ? 'w-16'"), 'Must prioritize w-16 when isMinimized is true');
+      assert.ok(topBarContent.includes('data-testid="btn-topbar-toggle-sidebar"'), 'TopBar must have sidebar toggle');
+    });
+
+    it('verifies toggleSidebarMinimized mutates store state and persists to storage', () => {
+      const stateBefore = getAetherState().sidebarMinimized;
+      toggleSidebarMinimized(true);
+      assert.strictEqual(getAetherState().sidebarMinimized, true);
+      toggleSidebarMinimized(false);
+      assert.strictEqual(getAetherState().sidebarMinimized, false);
+      toggleSidebarMinimized(!stateBefore);
+      assert.strictEqual(getAetherState().sidebarMinimized, !stateBefore);
+      // Restore initial state
+      toggleSidebarMinimized(stateBefore);
+    });
+  });
 });
+
