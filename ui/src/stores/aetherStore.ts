@@ -3689,7 +3689,7 @@ export async function sendAiMessage(prompt: string): Promise<void> {
           provider,
           model,
           prompt: trimmed,
-          system_prompt: session.systemPrompt || 'You are AetherCortex AI Assistant, a high-performance terminal and systems assistant.',
+          system_prompt: session.systemPrompt || 'You are AetherCortex AI Assistant. Be concise, direct, and actionable. Never overexplain, lecture, or add unnecessary preamble/postamble. Provide exact solutions, terminal commands, or answers directly without fluff.',
           history,
         });
         assistantReply = typeof res === 'string' ? res : (res?.content || JSON.stringify(res));

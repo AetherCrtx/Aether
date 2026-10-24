@@ -1134,11 +1134,12 @@ async fn process_request(ctx: &DaemonContext, req: IpcRequest) -> IpcResponse {
             }
             let client = aetherd::ai_pilot::AiPilotClient::new();
             let mut messages = Vec::new();
-            if let Some(sys) = system_prompt {
-                if !sys.trim().is_empty() {
-                    messages.push(aetherd::ai_pilot::ChatMessage::system(sys));
-                }
-            }
+            let default_sys = "You are AetherCortex AI Assistant. Be concise, direct, and actionable. Never overexplain, lecture, or add unnecessary preamble/postamble. Provide exact solutions, terminal commands, or answers directly without fluff.".to_string();
+            let effective_sys = match system_prompt {
+                Some(ref s) if !s.trim().is_empty() => s.clone(),
+                _ => default_sys,
+            };
+            messages.push(aetherd::ai_pilot::ChatMessage::system(effective_sys));
             if let Some(hist) = history {
                 for item in hist {
                     match item.role.as_str() {

@@ -422,7 +422,6 @@ const AssistantBubble: React.FC<{ msg: AiMessage; model: string; onRetry: () => 
       ) : (
         <div className="space-y-2">
           <MarkdownContent content={msg.content} />
-          {msg.metadata?.cards && <InfoCards cards={msg.metadata.cards} />}
         </div>
       )}
     </div>
@@ -439,7 +438,6 @@ const SystemBubble: React.FC<{ msg: AiMessage }> = ({ msg }) => (
       <span className="font-mono">{new Date(msg.timestamp).toLocaleTimeString()}</span>
     </div>
     <MarkdownContent content={msg.content} />
-    {msg.metadata?.cards && <InfoCards cards={msg.metadata.cards} />}
   </div>
 );
 
@@ -838,7 +836,7 @@ export const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
             <div className="space-y-1.5">
               <span className="font-bold text-sm text-cortex-text block">AetherCortex Assistant</span>
               <p className="text-[13px] text-cortex-textMuted max-w-[260px] leading-relaxed">
-                Tampilkan informasi sistem, jalankan command AI (/help), atau kirim prompt ke terminal.
+                Asisten AI untuk automasi terminal dan eksekusi command.
               </p>
             </div>
             <div className="flex flex-col gap-2 w-full max-w-[280px]">
@@ -856,11 +854,11 @@ export const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  setInputVal('tampilkan informasi sistem saya secara lengkap');
+                  setInputVal('bagaimana cara cek status git dan branch aktif?');
                 }}
                 className="w-full text-left px-3 py-2 rounded-lg bg-[#0D151A] border border-[#182631] hover:border-sky-400/60 text-xs text-cortex-text transition-colors"
               >
-                &ldquo;tampilkan informasi sistem saya secara lengkap&rdquo;
+                &ldquo;bagaimana cara cek status git dan branch aktif?&rdquo;
               </button>
               <button
                 type="button"
