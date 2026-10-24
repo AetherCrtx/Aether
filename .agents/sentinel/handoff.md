@@ -1,34 +1,30 @@
-# Sentinel Handoff Report — Phase 2 Completion
+# Sentinel Handoff Report — AetherCortex UI/UX Refactor & AI Integration
 
 ## 1. Observation
-- Original user request was recorded verbatim in `.agents/ORIGINAL_REQUEST.md` covering R1 (Aether Drive Sidebar with `Cmd+\`/`Ctrl+\`), R2 (Intelligent Natural Language vs Shell Command Classifier), R3 (Persistent Terminal & Remote Session Resilience), and full build/test acceptance criteria.
-- General task route selected -> Project Orchestrator (`teamwork_preview_orchestrator`, ID: `b4b0fa97-873a-4908-ab8b-7c3e9bde85fa`) spawned and managed across 4 milestones.
-- Periodic progress monitoring (`task-14`) and liveness monitoring (`task-16`) kept track of all subagent executions with zero deadlocks or stalls.
-- Orchestrator reported completion with 79 passing Cargo tests, 71 passing UI tests, clean TypeScript production build, and updated architecture knowledge graph.
-- Independent Victory Auditor (`teamwork_preview_victory_auditor`, ID: `91c6c6ec-3538-4d63-af36-458183732d47`) was spawned to independently verify timeline/scope, execute cheating/facade scans, and run all test and build commands from scratch.
-- Victory Auditor returned `VERDICT: VICTORY CONFIRMED`.
+- Received a substantive user request to refactor the AetherCortex application into a polished, modern AI-powered terminal interface (Minimalism + Neo-Brutalism, R1-R6, strict no-BYOK, zero emojis, full test suite & graphify sync).
+- Appended the verbatim user request to `.agents/ORIGINAL_REQUEST.md` under UTC timestamp `2026-10-24T09:53:51Z`.
+- Evaluated request against Routing Decision Table: complex multi-component full-stack refactor across UI design tokens, layout, terminal engine preservation, side-by-side AI assistant panel, synchronized input bar, multi-provider and custom provider management, and test suites -> routed to General (`teamwork_preview_orchestrator`).
+- Spawned `teamwork_preview_orchestrator` (conversation ID: `ead1cd55-cf02-46d6-87a8-94f126e8c82f`) with working directory `.agents/teamwork_preview_orchestrator_2`.
+- Scheduled recurring Cron 1 (`*/8 * * * *`, task ID `task-24`) for Progress Reporting.
+- Scheduled recurring Cron 2 (`*/10 * * * *`, task ID `task-26`) for Liveness Check.
+- Updated `BRIEFING.md` with active orchestrator ID and cron tasks.
 
 ## 2. Logic Chain
-- Routing Decision: The request encompassed full-stack UI, Tauri IPC commands, daemon PTY session management, heuristic command parsing, and comprehensive test suite creation. It required task decomposition across specialists -> routed to `teamwork_preview_orchestrator`.
-- Execution Management: The team decomposed work into 4 milestones with rigorous adversarial reviews (Reviewers, Challengers, and Forensic Auditors) gating each milestone before progressing to the next.
-- Independent Verification: Under the mandatory Sentinel Victory Audit protocol, the claim was subjected to a fresh, independent audit by `teamwork_preview_victory_auditor`. The auditor executed:
-  1. `cd ui && npx tsc --noEmit && npm run build` -> 0 errors, 1599 modules built cleanly.
-  2. `cargo check --workspace` -> 0 errors.
-  3. `cargo test --workspace` -> 79 passed, 0 failed.
-  4. `cd ui && node --test tests/e2ePhase2.test.ts tests/commandClassifier.test.ts tests/aetherDriveSidebar.test.ts` -> 71 passed, 0 failed.
-  5. `graphify update .` -> cleanly synced (2069 nodes, 3821 edges).
-- Post-Victory Cleanup: Both monitoring crons were cancelled via `manage_task(action="kill")` and all subagents were cleanly terminated via `manage_subagents(action="kill_all")`.
+- Task Routing: The request spans multiple frontend and backend systems (brand identity tokens, CSS variables, left sidebar, xterm engine preservation, AI conversation panel, synchronized input bar, provider configurations, custom provider testing, and comprehensive test suite). It is not a document review, math/proof, or small isolated patch. Thus, it strictly routes to the General path (`teamwork_preview_orchestrator`).
+- Orchestrator Lifecycle: Created dedicated working directory `.agents/teamwork_preview_orchestrator_2` to keep state separate from previous phases.
+- Sentinel Monitoring: Activated 8-minute progress reporting cron and 10-minute liveness check cron to monitor `progress.md` and file modifications.
+- Independent Verification: When the orchestrator claims victory, an independent `teamwork_preview_victory_auditor` will be spawned to conduct timeline forensics, cheating checks, and end-to-end command verification before reporting completion to the caller/user.
 
 ## 3. Caveats
-- Production deployment of Tauri GUI depends on underlying webkit2gtk libraries on Linux hosts.
-- Ripgrep backend search relies on `rg` binary presence, with pure-Rust multi-threaded walker providing automatic fallback.
-- In desktop environments, ensure desktop global hotkeys do not swallow `Cmd+\` / `Ctrl+\`.
+- Strict UI copy restriction: Never display the term "BYOK" anywhere in the application UI (use "API Key", "Provider Settings", or "Connection Settings").
+- Flat colors only: no gradients, no glassmorphism, no excessive glow, and no decorative clutter.
+- Zero emoji characters in code, comments, or documentation.
+- Terminal engine, PTY daemon connections, and xterm rendering must remain intact and functional.
 
 ## 4. Conclusion
-All Phase 2 requirements (R1, R2, R3) and acceptance criteria have been implemented, thoroughly tested, and independently verified. The project is fully complete and green.
+- Orchestration swarm initiated under `teamwork_preview_orchestrator_2`. Crons active and monitoring. Sentinel waiting reactively for orchestrator milestones, progress reports, and victory claim.
 
 ## 5. Verification Method
-- Independent Victory Auditor handoff: `/home/rasshqa/projects/Elliot/.agents/teamwork_preview_victory_auditor_1/handoff.md`
-- Test Ready Specification: `/home/rasshqa/projects/Elliot/TEST_READY.md`
-- Gate Status Record: `/home/rasshqa/projects/Elliot/.agents/teamwork_preview_orchestrator_1/GATE_STATUS.md`
-- Codebase Knowledge Graph: `graphify-out/graph.json`
+- Authoritative user request: `/home/rasshqa/projects/Elliot/.agents/ORIGINAL_REQUEST.md`
+- Sentinel persistent briefing: `/home/rasshqa/projects/Elliot/.agents/sentinel/BRIEFING.md`
+- Orchestrator working directory: `/home/rasshqa/projects/Elliot/.agents/teamwork_preview_orchestrator_2`

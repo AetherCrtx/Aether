@@ -1,40 +1,25 @@
-# DISPATCH — Reviewer (Milestone 3)
+## 2026-10-24T11:17:43Z
+You are Milestone 3 Code Reviewer 1.
+Your Working Directory: /home/rasshqa/projects/Elliot/.agents/teamwork_preview_reviewer_m3_1
+Authoritative Request: /home/rasshqa/projects/Elliot/.agents/ORIGINAL_REQUEST.md
+Project Root: /home/rasshqa/projects/Elliot
+Scope & Architecture: /home/rasshqa/projects/Elliot/PROJECT.md
+Worker Handoff: /home/rasshqa/projects/Elliot/.agents/teamwork_preview_worker_m3_cortex/handoff.md
 
-## Mission
-Review Milestone 3 implementation of the Aether Drive Sidebar Component & State Persistence (Requirement R1):
-- `ui/src/components/AetherDriveSidebar.tsx`
-- `ui/src/main.tsx`
-- `ui/src/stores/aetherStore.ts`
-- `ui/tests/aetherDriveSidebar.test.ts`
-
-## Mandatory Inputs (Read first!)
-- Original User Request: `/home/rasshqa/projects/Elliot/.agents/ORIGINAL_REQUEST.md`
-- Project Architecture & Scope: `/home/rasshqa/projects/Elliot/PROJECT.md`
-- Worker M3 Handoff: `/home/rasshqa/projects/Elliot/.agents/teamwork_preview_worker_m3/handoff.md`
-- Your Working Directory: `/home/rasshqa/projects/Elliot/.agents/teamwork_preview_reviewer_m3_1`
-- Parent Conversation ID: `b4b0fa97-873a-4908-ab8b-7c3e9bde85fa`
-
-## Verification Requirements
-Run:
-```bash
-cd /home/rasshqa/projects/Elliot/ui
-node --test tests/commandClassifier.test.ts tests/aetherDriveSidebar.test.ts
-npx tsc --noEmit && npm run build
-```
-Verify:
-1. `Cmd+\` and `Ctrl+\` shortcut listeners and `localStorage` persistence.
-2. File tree expand/collapse, file inspection card with actions.
-3. Workspace text search panel with preview snippets.
-4. Saved workflows quick access with parameter inputs and execution.
-5. Production build succeeds with 0 TypeScript diagnostics and exit code 0.
-
-## Deliverable
-Write review report to `/home/rasshqa/projects/Elliot/.agents/teamwork_preview_reviewer_m3_1/handoff.md`.
-End with `VERDICT: APPROVE` or `VERDICT: REQUEST_CHANGES`. Notify parent via `send_message`.
-
-## 2026-10-24T04:16:44Z
-Read /home/rasshqa/projects/Elliot/.agents/teamwork_preview_reviewer_m3_1/DISPATCH.md and /home/rasshqa/projects/Elliot/.agents/ORIGINAL_REQUEST.md.
-Review Milestone 3 implementation (AetherDriveSidebar.tsx, main.tsx, aetherStore.ts, tests/aetherDriveSidebar.test.ts).
-Run automated tests and npx tsc --noEmit && npm run build in ui/.
-Write review report with VERDICT: APPROVE or VERDICT: REQUEST_CHANGES to /home/rasshqa/projects/Elliot/.agents/teamwork_preview_reviewer_m3_1/handoff.md and send a message when done.
-
+Review Milestone 3 deliverables:
+1. Examine ui/src/components/TopBar.tsx and ui/src/main.tsx:
+   - Terminal tab buttons with active styling, close trigger, and switchTab.
+   - New tab trigger (+) invoking createTab().
+   - 'AI Connected' status pill with Cosmic Cyan #00F0FF dot indicator and provider label.
+   - Standard window controls (minimize, maximize, close) with safe web execution checks.
+   - Verify terminal engine preservation: active PTY connections, xterm rendering, DA1/DA2/Kitty keyboard negotiation, split panes (Cmd+D / Cmd+Shift+D).
+2. Examine ui/src/components/InputBar.tsx:
+   - User-facing rename: confirm 'Modern Input Bar' is completely renamed to 'Input Bar' (in AgentHeaderPill.tsx:140 and UI strings).
+   - Multiline auto-height: adjusts smoothly between 32px and 160px based on content.
+   - Exact placeholder: 'Ask AetherCortex or enter a command...'.
+   - Clear mode distinction ($ vs #/natural language).
+   - Shell protection guard: prevents arbitrary shell execution of natural language prompts.
+   - Synchronized provider and model selector bound to store state.
+3. Verify test suite: ui/tests/terminalInputBarM3.test.ts.
+4. Run verification commands: npm run build in ui/, node --test tests/*.test.ts in ui/, cargo check --workspace, cargo test --workspace.
+5. Write your report to /home/rasshqa/projects/Elliot/.agents/teamwork_preview_reviewer_m3_1/handoff.md with explicit verdict: APPROVE or REQUEST_CHANGES. Send message to orchestrator.

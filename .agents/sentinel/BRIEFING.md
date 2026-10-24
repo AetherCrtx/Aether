@@ -1,40 +1,39 @@
-# BRIEFING — 2026-10-24T04:44:20Z
+# BRIEFING — 2026-10-24T09:53:51Z
 
 ## Mission
-Monitor orchestration and victory verification for completing Phase 2 roadmap of AetherTerminal (Aether Drive Sidebar, Natural Language Classifier, Persistent Terminal & Remote Resilience).
+Sentinel monitoring and verification for AetherCortex UI/UX Refactor & AI Integration (brand identity, terminal engine preservation, AI assistant panel, input bar provider synchronization, custom provider settings, dark/light mode tokens).
 
 ## 🔒 My Identity
 - Archetype: sentinel
 - Working directory: /home/rasshqa/projects/Elliot/.agents/sentinel
 - Orchestrator: b4b0fa97-873a-4908-ab8b-7c3e9bde85fa (terminated post-verification)
 - Victory Auditor: 91c6c6ec-3538-4d63-af36-458183732d47 (terminated post-verification)
+- Active Orchestrator: ead1cd55-cf02-46d6-87a8-94f126e8c82f
+- Active Victory Auditor: to be spawned on victory claim
+- Progress Cron Task: ba62c7c7-54fa-43d0-82ce-6b3b40b0d3a9/task-24 (*/8 * * * *)
+- Liveness Cron Task: ba62c7c7-54fa-43d0-82ce-6b3b40b0d3a9/task-26 (*/10 * * * *)
 
 ## 🔒 Key Constraints
 - No technical decisions — relay only
 - Victory Audit is MANDATORY before reporting completion
 - Must not write code, analyze problems, or make technical decisions directly
+- Routing Decision: General (teamwork_preview_orchestrator) per Routing Decision Table
 
 ## User Context
-- **Last user request**: Implement Aether Drive Sidebar, Intelligent NL vs Shell Classifier, and Persistent Terminal & Remote Session Resilience for AetherTerminal Phase 2 roadmap.
+- **Last user request**: Refactor AetherCortex into a polished modern AI-powered terminal interface (Minimalism + Neo-Brutalism, R1-R6, strict no-BYOK, zero emojis, full test suite & graphify sync).
 - **Pending clarifications**: none
 - **Delivered results**:
-  - R1: Aether Drive Sidebar (`Cmd+\` / `Ctrl+\`), responsive file tree, workspace search, saved markdown workflows, persistence.
-  - R2: Intelligent Natural Language vs Shell Classifier in ModernInputBar with seamless agent routing.
-  - R3: Persistent Terminal & Remote Session Resilience with SSH keepalive and buffer retention.
-  - 100% Build & Test Verification: 71 UI tests pass, 79 Cargo tests pass, `tsc && build` exit 0, `graphify` updated.
+  - Previous Phase 2 complete & verified.
+  - New UI/UX Refactor & AI Integration initialized.
 
 ## Project Status
-- **Phase**: complete
+- **Phase**: in progress
 
 ## Victory Audit Status
-- **Triggered**: yes
-- **Verdict**: VICTORY CONFIRMED
+- **Triggered**: no
+- **Verdict**: pending
 - **Retry count**: 0
 
 ## Artifact Index
 - /home/rasshqa/projects/Elliot/.agents/ORIGINAL_REQUEST.md — Original verbatim user request
-- /home/rasshqa/projects/Elliot/PROJECT.md — Project Plan & Decomposition
-- /home/rasshqa/projects/Elliot/TEST_READY.md — Test Ready Report
-- /home/rasshqa/projects/Elliot/.agents/teamwork_preview_orchestrator_1/handoff.md — Orchestrator Handoff
-- /home/rasshqa/projects/Elliot/.agents/teamwork_preview_victory_auditor_1/handoff.md — Victory Auditor Handoff Report
-- /home/rasshqa/projects/Elliot/.agents/sentinel/handoff.md — Sentinel Handoff Report
+- /home/rasshqa/projects/Elliot/.agents/sentinel/BRIEFING.md — Sentinel persistent briefing

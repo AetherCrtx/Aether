@@ -14,7 +14,7 @@ import {
 import { AgentHeaderPill } from './AgentHeaderPill';
 import { XtermWebGLPane } from './XtermWebGLPane';
 import { CommandBlocksOverlay } from './CommandBlocksOverlay';
-import { ModernInputBar } from './ModernInputBar';
+import { InputBar } from './InputBar';
 import { ErrorRecoveryBanner } from './ErrorRecoveryBanner';
 import { getPaneBlocks } from '../stores/aetherStore';
 import { Terminal, Plus, Sparkles, Command } from 'lucide-react';
@@ -157,7 +157,7 @@ export const TerminalGrid: React.FC<Props> = ({ registerTermWriter }) => {
         <div
           key={pane.id}
           data-pane-id={pane.id}
-          className="w-full h-full flex flex-col bg-tokyo-bgDark border border-tokyo-border/70 overflow-hidden shadow-inner"
+          className="w-full h-full flex flex-col bg-cortex-bg border border-cortex-border overflow-hidden shadow-inner"
         >
           <AgentHeaderPill pane={pane} isActive={isActive} />
           <div className="flex-1 w-full relative flex flex-col min-h-0">
@@ -175,7 +175,7 @@ export const TerminalGrid: React.FC<Props> = ({ registerTermWriter }) => {
             </div>
             <ErrorRecoveryBanner pane={pane} />
             {pane.inputBarOpen && (
-              <ModernInputBar
+              <InputBar
                 paneId={pane.id}
                 cliType={pane.cliType}
                 isAgentPane={
@@ -362,7 +362,7 @@ export const TerminalGrid: React.FC<Props> = ({ registerTermWriter }) => {
   }
 
   return (
-    <div className="w-full h-full p-1 bg-tokyo-bgDark">
+    <div className="w-full h-full p-0.5 bg-cortex-bg">
       {renderLayout(store.layout)}
     </div>
   );

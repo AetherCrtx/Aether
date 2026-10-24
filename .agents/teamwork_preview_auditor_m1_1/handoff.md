@@ -1,174 +1,160 @@
-# Forensic Audit Report — Milestone 1 (Backend APIs & Session Resilience)
+# Forensic Audit Report: Milestone 1 (AetherCortex Brand Identity, Design Tokens & Persistent Left Sidebar)
 
-**Work Product**: Milestone 1 code changes (`crates/aether-gui/src/ipc_bridge.rs`, `crates/aether-gui/src/main.rs`, `crates/aetherd/src/pty_manager.rs`)
-**Profile**: General Project
-**Integrity Mode**: development (as specified in `ORIGINAL_REQUEST.md:8`)
-**Verdict**: CLEAN
+**Work Product**: Milestone 1 Implementation (`ui/src/components/PersistentLeftSidebar.tsx`, `ui/src/main.tsx`, `ui/tailwind.config.js`, `ui/src/index.css`, `ui/src/utils/themes.ts`, `ui/src/stores/aetherStore.ts`, `ui/src/components/XtermWebGLPane.tsx`, `ui/tests/brandAndSidebarM1.test.ts`, all BYOK & Emoji removals)  
+**Profile**: General Project  
+**Auditor**: Forensic Auditor (`teamwork_preview_auditor_m1_1`)  
+**Parent Conversation ID**: `ead1cd55-cf02-46d6-87a8-94f126e8c82f`  
+**Verdict**: **CLEAN**
+
+---
+
+### Phase Results
+
+- **PersistentLeftSidebar Genuine Implementation**: **PASS** — Real inline SVG paths (`AetherCortexLogo`), genuine click handlers dispatching to store actions, reactive active indicators, and Neo-Brutalist bottom branding (`| BETTER TOOLS. BIGGER POSSIBILITIES.` and `///`). No placeholder stubs, dummy facades, or external image dependencies.
+- **Test Integrity in `ui/tests/`**: **PASS** — `brandAndSidebarM1.test.ts` and companion test suites assert against live store state, DOM CSS variables, classList attributes, and physical disk files. Zero trivial `assert.ok(true)` or `catch` suppression tricks detected.
+- **Prohibited Copy Restriction ("BYOK" Ban)**: **PASS** — 0 occurrences of "BYOK" in user-facing UI, source code, comments, or tooltips. The only occurrences across the entire repository are in test assertion definitions that explicitly enforce the ban and project specifications.
+- **Zero-Emoji Compliance**: **PASS** — Static repository audit scanning with `\p{Extended_Pictographic}` and comprehensive Unicode emoji blocks confirmed 0 emojis across all code, comments, and documentation.
+- **UI Production Build (`npm run build` in `ui/`)**: **PASS** — Exited with code 0. Transformed 1601 modules in 5.61s.
+- **UI Test Suite (`node --test tests/*.test.ts` in `ui/`)**: **PASS** — 85/85 tests passed across 32 suites (0 failures, duration 1.59s).
+- **Rust Workspace Compilation (`cargo check --workspace`)**: **PASS** — Finished with exit code 0, 0 errors, 0 warnings.
+- **Rust Workspace Tests (`cargo test --workspace`)**: **PASS** — 86/86 unit and integration tests passed across all workspace crates.
+- **Knowledge Graph Synchronization (`graphify update .`)**: **PASS** — Rebuilt 2435 nodes, 4473 edges, and 200 communities cleanly.
 
 ---
 
 ## 1. Observation
 
-### 1.1 Git Status & Scope Compliance
-Executing `git status --short` in `/home/rasshqa/projects/Elliot`:
-```
- M crates/aether-gui/src/ipc_bridge.rs
- M crates/aether-gui/src/main.rs
- M crates/aetherd/src/pty_manager.rs
-?? .agents/
-?? PROJECT.md
-```
-- Only the 3 assigned Milestone 1 source files were modified.
-- No files in `ui/` or other crates were touched.
-- `.agents/` contains only metadata (plans, progress, handoffs, briefings).
+Direct, empirical observations obtained from executing forensic checks across the workspace:
 
-### 1.2 Source Code Inspection
-1. **Remote SSH Session Resilience (`crates/aetherd/src/pty_manager.rs:119-152, 161-197, 322-325`)**:
-   - `inject_ssh_keepalive_args(args: &mut Vec<String>)`: Dynamically inspects the argument vector for `ServerAliveInterval`, `ServerAliveCountMax`, and `TCPKeepAlive`. If absent, prepends `-o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o TCPKeepAlive=yes`.
-   - `is_ssh_command(cmd: &str)`: Case-insensitive check matching `"ssh"` or paths ending with `"/ssh"`.
-   - Idempotency and user flag preservation verified: if custom keepalives are passed (e.g. `ServerAliveInterval=60`), existing arguments are preserved and not overridden.
-   - PTY spawn integration: `resolve_exec_and_args` and `spawn_pane` ensure keepalive flags are attached to all SSH invocations.
+1. **Persistent Left Sidebar (`ui/src/components/PersistentLeftSidebar.tsx`)**:
+   - `AetherCortexLogo` (lines 26-59): Implemented as a pure inline SVG (`viewBox="0 0 100 100"`) containing:
+     - Ellipse orbit swoosh (`stroke="#00F0FF"`, `transform="rotate(-24 50 52)"`, `strokeDasharray="180 30"`)
+     - Neo-Brutalist geometric white letter A (`path d="M50 18L26 80H37.5L43 65H57L62.5 80H74L50 18ZM46.5 54.5L50 43.5L53.5 54.5H46.5Z" fill="#F8F9FA"`)
+     - Apex sparkle star (`path d="M74 25L75.5 30L80.5 31.5L75.5 33L74 38L72.5 33L67.5 31.5L72.5 30L74 25Z" fill="#00F0FF"`)
+   - Navigation buttons (lines 115-192): 4 targets (`Terminal`, `AI Assistant`, `Workspace`, `Settings`). Each has active indicator rendering (`<span className="absolute left-0 top-1 bottom-1 w-[2px] bg-cortex-accent" />`) and dispatches through `handleNavClick` to `toggleSidebar`, `toggleAiAssistant`, and `toggleAiSettings`.
+   - Bottom branding (lines 196-210): Neo-Brutalist cyan vertical bar (`w-[2px] h-7 bg-cortex-accent`), uppercase slogan `BETTER TOOLS. BIGGER POSSIBILITIES.`, and diagonal slashes `///`.
+   - Layout integration (`ui/src/main.tsx` lines 130-135): Mounted on the leftmost column of the root container (`flex flex-row h-screen w-screen bg-cortex-bg text-cortex-text font-sans overflow-hidden`), preserving terminal execution and PTY connections.
 
-2. **Workspace Directory API (`crates/aether-gui/src/ipc_bridge.rs:670-678, 752-852`)**:
-   - `WorkspaceFileEntry` struct strictly adheres to `PROJECT.md § Interface Contracts`:
-     ```rust
-     #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-     pub struct WorkspaceFileEntry {
-         pub name: String,
-         pub path: String,
-         pub is_dir: bool,
-         pub is_symlink: bool,
-         pub size_bytes: u64,
-         pub extension: Option<String>,
-     }
-     ```
-   - `read_workspace_directory_impl` uses `std::fs::read_dir` on canonicalized paths.
-   - Directory traversal protection: rigorously validates `canonical_target.starts_with(&canonical_root)` and returns `Err("Security violation: directory '...' escapes workspace root")` if breached.
-   - Artifact filtering: automatically ignores `.git`, `target`, and `node_modules`.
-   - Sorting: strictly sorts directories alphabetically first, followed by files alphabetically.
+2. **Design Tokens & Theme Synchronization**:
+   - `ui/tailwind.config.js`: Defined `cortex` color dictionary pointing to CSS variables (`--cortex-accent`, `--cortex-bg`, etc.) and `sans: ['Inter', 'system-ui', ...]`.
+   - `ui/src/index.css`: Provided flat design tokens for `:root, :root.dark-mode` (`#050809` / `#0B1013` / `#00F0FF`) and `:root.light-mode` (`#F8F9FA` / `#FFFFFF` / `#00A3AD`).
+   - `ui/src/utils/themes.ts`: Defined `aethercortex-dark` and `aethercortex-light`. `applyTheme()` dynamically updates `--cortex-*` properties on `document.documentElement.style`.
+   - `ui/src/components/XtermWebGLPane.tsx` (lines 460-465): Added `useEffect` subscribing to `store.currentTheme` to update `termRef.current.options.theme` reactively without dropping PTY streams.
 
-3. **Workspace File Content Inspection API (`crates/aether-gui/src/ipc_bridge.rs:690-695, 854-913`)**:
-   - `WorkspaceFileContent` struct matches specification:
-     ```rust
-     #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-     pub struct WorkspaceFileContent {
-         pub relative_path: String,
-         pub content: String,
-         pub total_bytes: u64,
-         pub is_truncated: bool,
-     }
-     ```
-   - Traversal protection: validates canonical boundary.
-   - Bounded read: uses `file.take(limit as u64).read_to_end(&mut buffer)` with default 256KB threshold to prevent OOM on giant files.
-   - Reports exact `total_bytes` from `metadata.len()` and sets `is_truncated = total_bytes > buffer.len() as u64`.
-   - Uses `String::from_utf8_lossy` for resilient lossy UTF-8 conversion without panic.
+3. **Strict Copy Restriction ("BYOK" Ban)**:
+   - Full repository search for `BYOK` (`grep -rni "BYOK"`) confirmed zero occurrences in user-facing UI, tooltips, buttons, modals, or backend error strings. All 8 legacy instances were replaced with "API Key" or "Provider Settings".
 
-4. **Workspace Text Search API (`crates/aether-gui/src/ipc_bridge.rs:680-687, 915-1177`)**:
-   - `WorkspaceSearchMatch` struct matches specification:
-     ```rust
-     #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-     pub struct WorkspaceSearchMatch {
-         pub file_path: String,
-         pub line_number: usize,
-         pub line_content: String,
-         pub match_start: usize,
-         pub match_end: usize,
-     }
-     ```
-   - Dual-engine architecture:
-     1. Primary: Spawns `rg --json --smart-case -F -g !.git -g !target -g !node_modules -g !dist -g !.aether <query> <root>` and parses JSON output stream, terminating the process once `limit` is met.
-     2. Fallback: Standalone pure Rust walker (`search_workspace_files_rust`) with recursive stack traversal, skipping `.git`/`target`/`node_modules`/`dist`/`.aether`, skipping files > 5MB, and skipping binary files via null-byte probe (`header[..bytes_read].contains(&0)`). Supports smart-case and multi-match offset tracking.
+4. **Zero-Emoji Compliance**:
+   - Automated scan with `\p{Extended_Pictographic}` across all files outside `.git`, `target`, `node_modules`, `dist`, `.agents`, and `graphify-out` returned `0` emoji occurrences.
 
-5. **Tauri Command Registration (`crates/aether-gui/src/main.rs:13-16, 65-68`)**:
-   - Registered `cmd_read_workspace_directory`, `cmd_search_workspace_files`, `cmd_read_workspace_file` in `tauri::generate_handler![]`.
-
-### 1.3 Forensic Artifact & Pattern Checks
-- **Hardcoded test results**: None. All functions compute live outputs from the filesystem or process arguments.
-- **Facade implementations**: None. Zero dummy `return <constant>`, zero `todo!()`, zero `unimplemented!()`.
-- **Pre-populated verification artifacts**: Executed `find . -not -path '*/.*' -not -path './target*' -not -path './ui/node_modules*' \( -name '*.log' -o -name '*result*' -o -name '*output*' \)` -> 0 files found.
-- **Self-certifying tests**: None. All 13 unit tests dynamically allocate unique temporary directories with `Uuid::new_v4()`, populate dynamic test files, exercise edge cases, and clean up.
-
-### 1.4 Independent Build & Test Execution
-- **Cargo Check**:
-  - Command: `cargo check --workspace`
-  - Output: Exit code 0, 0 compiler errors, 0 warnings.
-- **Cargo Test Suite**:
-  - Command: `cargo test --workspace`
-  - Output: Exit code 0, 45 passed, 0 failed, 0 ignored across 7 test suites:
-    - `aether-gui`: 13 passed (including 8 new workspace IPC tests)
-    - `aether-mcp`: 1 passed
-    - `aether-protocol`: 4 passed
-    - `aetherd` (lib): 20 passed (including 5 new SSH keepalive tests)
-    - `aetherd` (main): 5 passed
-    - `daemon_integration_test`: 1 passed
-    - `vault_workflows_test`: 1 passed
-- **Frontend UI Build**:
-  - Command: `npx tsc --noEmit && npm run build` (in `/home/rasshqa/projects/Elliot/ui`)
-  - Output: Exit code 0, 0 TypeScript errors, Vite production build generated in `dist/`.
-- **Knowledge Graph Update**:
-  - Command: `graphify update .`
-  - Output: Exit code 0, rebuilt 1470 nodes, 3014 edges across 100 communities.
+5. **Empirical Verification Results**:
+   - `npm run build` in `ui/`: Exit code 0, 1601 modules transformed in 5.61s.
+   - `node --test tests/*.test.ts` in `ui/`: 85/85 tests passed across 32 suites (0 failures).
+   - `cargo check --workspace`: Exit code 0, 0 errors, 0 warnings.
+   - `cargo test --workspace`: 86/86 tests passed across all crates.
+   - `graphify update .`: Synchronized 2435 nodes and 4473 edges cleanly.
 
 ---
 
 ## 2. Logic Chain
 
-1. **Absence of Circumvention**:
-   - *Observation*: No hardcoded returns, dummy values, or facade stubs exist in `ipc_bridge.rs`, `main.rs`, or `pty_manager.rs`.
-   - *Logic*: The implementations perform genuine filesystem traversal, process spawning, bounded file reads, JSON stream parsing, and argument manipulation.
+1. **Genuine Implementation vs Facade Detection**:
+   - A facade implementation typically returns hardcoded stubs, omits event handling, or renders empty placeholder boxes.
+   - Observation 1 demonstrates that `PersistentLeftSidebar.tsx` contains 214 lines of production React JSX, with custom inline SVG geometry, real event handlers delegating to the application's Zustand store, and dynamic CSS styling based on active section states.
+   - Therefore, the component is a genuine, complete implementation.
 
-2. **Security & Boundary Enforcement**:
-   - *Observation*: Traversal attempts (`../../`) trigger canonical path comparison errors in both `read_workspace_directory_impl` and `read_workspace_file_impl`.
-   - *Logic*: The application cannot be exploited to read or enumerate arbitrary files outside the workspace root.
+2. **Test Integrity vs Hardcoding / Mock Circumvention**:
+   - An integrity violation occurs if tests mock out the component into a no-op, suppress errors via catch-blocks, or assert against hardcoded tautologies (`assert.ok(true)`).
+   - Examination of `ui/tests/brandAndSidebarM1.test.ts` reveals direct testing of:
+     - Theme definitions in `AETHER_THEMES` matching the exact palette colors (`#00F0FF`, `#050809`, etc.).
+     - DOM mutation via `applyTheme()` setting style properties on `document.documentElement`.
+     - Zustand store actions (`setAetherTheme`, `toggleAiAssistant`, `toggleSidebar`) updating state and localStorage.
+     - Physical file inspection confirming required component exports, slogan strings, and font configurations.
+     - Disk-wide regex scans verifying the absence of "BYOK" and Unicode emojis.
+   - Therefore, the tests assert genuine logic and enforce the specifications.
 
-3. **Resilience & Fault Tolerance**:
-   - *Observation*: SSH keepalives are injected idempotently (`ServerAliveInterval=15`, `ServerAliveCountMax=3`, `TCPKeepAlive=yes`), search falls back to pure Rust when `rg` is absent, and file inspection caps buffer reads to 256KB.
-   - *Logic*: Remote sessions will survive NAT/firewall idle drops, search functions in all host environments without hard dependency on external binaries, and large files will not trigger OOM or freeze the GUI.
-
-4. **Acceptance Criteria & Integrity Mode Conformance**:
-   - *Observation*: The mode is `development` (`ORIGINAL_REQUEST.md:8`). All code builds cleanly, all 45 tests pass, and graphify updates without errors.
-   - *Logic*: All functional requirements and code quality acceptance criteria for Milestone 1 are completely and genuinely satisfied.
+3. **Constraint Enforcement**:
+   - The user specification in `ORIGINAL_REQUEST.md` (R1, R5, Acceptance Criteria) strictly mandated zero "BYOK" mentions and zero emojis.
+   - Empirical grep and regex execution confirmed 0 occurrences of both prohibited patterns.
+   - Therefore, all user constraints are fully satisfied.
 
 ---
 
 ## 3. Caveats
 
-- **No Caveats**: The audit covered all 3 modified files, executed full workspace builds and tests, tested edge cases, verified git status, and inspected AST graph generation.
+- Milestone 1 encompasses Brand Identity, Design Tokens, Persistent Left Sidebar, Typography, Reactive Terminal Theming, BYOK elimination, and Zero-Emoji compliance.
+- Milestone 2 will handle AI Provider store synchronization and Custom Provider configuration.
+- Live Tauri desktop window rendering was verified at the build and unit test levels; end-to-end window automation occurs at Milestone 4.
 
 ---
 
 ## 4. Conclusion
 
-The work product delivered in Milestone 1 demonstrates genuine, robust, and clean implementation with 0 integrity violations, complete test coverage, and strict interface contract compliance.
+The work product submitted for Milestone 1 satisfies all functional, architectural, and integrity requirements. There are no dummy facades, no hardcoded test shortcuts, zero BYOK mentions, zero emojis, and all build and test verification commands pass with 100% success.
 
-**VERDICT: CLEAN**
+**Final Forensic Verdict**: **CLEAN**
 
 ---
 
 ## 5. Verification Method
 
-To independently reproduce and verify this audit:
+To independently verify these findings:
 
-1. **Inspect Modified Files**:
+1. **Verify UI Production Build**:
    ```bash
-   git status --short
-   git diff crates/aether-gui/src/main.rs
-   git diff crates/aetherd/src/pty_manager.rs
-   git diff crates/aether-gui/src/ipc_bridge.rs
+   cd /home/rasshqa/projects/Elliot/ui
+   npm run build
    ```
+   *Expected: Exit code 0, 1601 modules transformed.*
 
-2. **Verify Rust Build and Tests**:
+2. **Run UI Test Suites**:
    ```bash
+   cd /home/rasshqa/projects/Elliot/ui
+   node --test tests/*.test.ts
+   ```
+   *Expected: 85 tests passing (0 failures).*
+
+3. **Run Rust Compilation and Tests**:
+   ```bash
+   cd /home/rasshqa/projects/Elliot
    cargo check --workspace
-   cargo test --workspace -- --nocapture
+   cargo test --workspace
    ```
+   *Expected: 0 warnings, 86 unit/integration tests passing.*
 
-3. **Verify Frontend UI Build**:
+4. **Verify Zero BYOK**:
    ```bash
-   cd ui && npx tsc --noEmit && npm run build
+   cd /home/rasshqa/projects/Elliot
+   grep -rnwi "BYOK" ui/src/ crates/aetherd/src/
    ```
+   *Expected: 0 matches.*
 
-4. **Verify Knowledge Graph**:
+5. **Verify Zero Emojis**:
    ```bash
-   graphify update .
+   cd /home/rasshqa/projects/Elliot
+   node -e '
+   const fs = require("fs");
+   const path = require("path");
+   const emojiRegex = /\p{Extended_Pictographic}/u;
+   const ignoreDirs = new Set([".git", "target", "node_modules", "dist", ".agents", "graphify-out"]);
+   let count = 0;
+   function walk(dir) {
+     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+       if (ignoreDirs.has(entry.name)) continue;
+       const full = path.join(dir, entry.name);
+       if (entry.isDirectory()) walk(full);
+       else if (entry.isFile()) {
+         try {
+           const text = fs.readFileSync(full, "utf8");
+           for (const ch of text) {
+             if (emojiRegex.test(ch)) count++;
+           }
+         } catch (e) {}
+       }
+     }
+   }
+   walk(".");
+   console.log("TOTAL EMOJIS FOUND:", count);
+   '
    ```
+   *Expected: TOTAL EMOJIS FOUND: 0.*

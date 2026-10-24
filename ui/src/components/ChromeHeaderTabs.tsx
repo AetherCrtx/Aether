@@ -13,14 +13,14 @@ import {
 import { Plus, X, Edit3, Copy, XCircle, Palette } from 'lucide-react';
 
 const PRESET_TAB_COLORS = [
-  { name: 'Default', value: null, hex: '#7aa2f7' },
-  { name: 'Cyan', value: '#06b6d4', hex: '#06b6d4' },
+  { name: 'Default', value: null, hex: '#00F0FF' },
+  { name: 'Cyan', value: '#00F0FF', hex: '#00F0FF' },
   { name: 'Blue', value: '#3b82f6', hex: '#3b82f6' },
   { name: 'Purple', value: '#a855f7', hex: '#a855f7' },
   { name: 'Pink', value: '#ec4899', hex: '#ec4899' },
-  { name: 'Emerald', value: '#10b981', hex: '#10b981' },
-  { name: 'Amber', value: '#f59e0b', hex: '#f59e0b' },
-  { name: 'Rose', value: '#f43f5e', hex: '#f43f5e' },
+  { name: 'Emerald', value: '#00E599', hex: '#00E599' },
+  { name: 'Amber', value: '#FFB800', hex: '#FFB800' },
+  { name: 'Rose', value: '#FF3B5C', hex: '#FF3B5C' },
 ];
 
 interface ContextMenuState {
@@ -45,7 +45,6 @@ export const ChromeHeaderTabs: React.FC = () => {
     }
   }, [editingTabId]);
 
-  // Click outside listener for context menu
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -99,11 +98,11 @@ export const ChromeHeaderTabs: React.FC = () => {
   };
 
   return (
-    <div className="flex items-end h-full overflow-x-auto no-scrollbar flex-1 max-w-[calc(100vw-540px)] min-w-[150px] space-x-1 pl-2 select-none relative">
+    <div className="flex items-end h-full overflow-x-auto no-scrollbar flex-1 max-w-[calc(100vw-440px)] min-w-[150px] space-x-1 pl-1 select-none relative">
       {store.tabs.map((tab, idx) => {
         const isActive = store.activeTabId === tab.id;
         const tabActivePane = store.panes.find((p) => p.id === tab.activePaneId);
-        const tabColor = tab.color || tabActivePane?.color || '#7aa2f7';
+        const tabColor = tab.color || tabActivePane?.color || '#00F0FF';
 
         return (
           <div
@@ -112,28 +111,35 @@ export const ChromeHeaderTabs: React.FC = () => {
             onDoubleClick={(e) => startEditing(tab, e)}
             onContextMenu={(e) => handleContextMenu(tab, e)}
             title={`${tab.title} (Right-click for options · Double-click to rename · Alt+${idx + 1})`}
-            className={`group relative flex items-center space-x-2 px-3 py-1.5 rounded-t-lg transition-all cursor-pointer border-t border-x shrink-0 ${
+            data-testid={`tab-${tab.id}`}
+            data-active={isActive ? 'true' : 'false'}
+            className={`group relative flex items-center space-x-2 px-3 py-1.5 rounded-t-md transition-all cursor-pointer border-t border-x shrink-0 ${
               isActive
-                ? 'bg-slate-800 text-white border-slate-700/90 shadow-sm font-medium z-10'
-                : 'bg-slate-900/50 text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border-transparent hover:border-slate-800/60'
+                ? 'bg-cortex-bg text-cortex-text border-cortex-border font-medium z-10 shadow-sm'
+                : 'bg-cortex-bgAlt/60 text-cortex-textMuted hover:text-cortex-text hover:bg-cortex-surface2 border-transparent hover:border-cortex-border'
             }`}
             style={{
-              minWidth: '110px',
-              maxWidth: '200px',
-              borderTopColor: tab.color ? tab.color : undefined,
-              borderTopWidth: tab.color ? '2px' : undefined,
+              minWidth: '120px',
+              maxWidth: '220px',
+              borderTopColor: tab.color ? tab.color : isActive ? '#00F0FF' : undefined,
+              borderTopWidth: tab.color || isActive ? '2px' : undefined,
             }}
           >
+            {/* Terminal prompt icon >_ matching reference mockup */}
+            <span className="font-mono text-[11px] font-bold text-cortex-accent shrink-0 select-none">
+              &gt;_
+            </span>
+
             {/* Active Color Pip Indicator */}
-            <span
-              className={`w-2 h-2 rounded-full shrink-0 transition-transform ${
-                isActive ? 'shadow-sm scale-110' : 'opacity-70 group-hover:opacity-100'
-              }`}
-              style={{
-                backgroundColor: tabColor,
-                boxShadow: isActive ? `0 0 8px ${tabColor}88` : undefined,
-              }}
-            />
+            {tab.color && (
+              <span
+                className="w-1.5 h-1.5 rounded-full shrink-0"
+                style={{
+                  backgroundColor: tabColor,
+                  boxShadow: isActive ? `0 0 6px ${tabColor}` : undefined,
+                }}
+              />
+            )}
 
             {/* Tab Title or Inline Editing Input */}
             {editingTabId === tab.id ? (
@@ -145,30 +151,31 @@ export const ChromeHeaderTabs: React.FC = () => {
                 onBlur={() => handleFinishEditing(tab.id)}
                 onKeyDown={(e) => handleKeyDown(tab.id, e)}
                 onClick={(e) => e.stopPropagation()}
-                className="bg-slate-950 text-white text-[11px] px-1 py-0.5 rounded border border-cyan-400 outline-none w-24 font-mono"
+                className="bg-cortex-surface2 text-cortex-text text-[11px] px-1 py-0.5 rounded border border-cortex-accent outline-none w-24 font-mono"
               />
             ) : (
-              <span className="font-mono text-xs truncate flex-1">
+              <span className="font-mono text-xs truncate flex-1 tracking-tight">
                 {tab.title}
               </span>
             )}
 
             {/* Split panes count if > 1 */}
             {tab.paneIds && tab.paneIds.length > 1 && (
-              <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-slate-700/80 text-cyan-300 font-mono shrink-0">
+              <span className="px-1 py-0.2 rounded text-[9px] bg-cortex-surface2 text-cortex-accent font-mono shrink-0 border border-cortex-border">
                 {tab.paneIds.length}
               </span>
             )}
 
-            {/* Chrome-style Tab Close Button */}
+            {/* Tab Close Button */}
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 closeTab(tab.id);
               }}
-              className={`p-0.5 rounded-full text-slate-400 hover:text-white hover:bg-slate-700/80 transition-colors shrink-0 ${
-                isActive ? 'opacity-90' : 'opacity-0 group-hover:opacity-100'
+              data-testid={`tab-close-${tab.id}`}
+              className={`p-0.5 rounded text-cortex-textMuted hover:text-cortex-text hover:bg-cortex-surface2 transition-colors shrink-0 ${
+                isActive ? 'opacity-80' : 'opacity-0 group-hover:opacity-100'
               }`}
               title="Close Tab (Ctrl+Shift+W)"
             >
@@ -178,10 +185,11 @@ export const ChromeHeaderTabs: React.FC = () => {
         );
       })}
 
-      {/* Chrome '+' Add Tab Button */}
+      {/* '+' Add Tab Button */}
       <button
         onClick={() => createTab()}
-        className="p-1.5 mb-0.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors shrink-0"
+        data-testid="btn-new-tab"
+        className="p-1.5 mb-0.5 rounded text-cortex-textMuted hover:text-cortex-accent hover:bg-cortex-surface2 transition-colors shrink-0"
         title="New Tab (Ctrl+T)"
       >
         <Plus className="w-4 h-4" />
@@ -191,14 +199,14 @@ export const ChromeHeaderTabs: React.FC = () => {
       {contextMenu && (
         <div
           ref={menuRef}
-          className="fixed z-50 w-52 bg-slate-900 border border-slate-700/80 rounded-lg shadow-2xl py-1 text-slate-200 text-xs font-sans backdrop-blur-md animate-scaleUp"
+          className="fixed z-50 w-52 bg-cortex-bgAlt border border-cortex-border rounded-lg shadow-2xl py-1 text-cortex-text text-xs font-sans backdrop-blur-md animate-scaleUp"
           style={{ top: contextMenu.y, left: contextMenu.x }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Color Selector */}
-          <div className="px-3 py-1.5 border-b border-slate-800">
-            <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1.5">
-              <Palette className="w-3 h-3 text-cyan-400" />
+          <div className="px-3 py-1.5 border-b border-cortex-border">
+            <div className="flex items-center gap-1.5 text-[10px] text-cortex-textMuted font-semibold uppercase tracking-wider mb-1.5">
+              <Palette className="w-3 h-3 text-cortex-accent" />
               <span>Tab Color</span>
             </div>
             <div className="flex items-center gap-1.5 flex-wrap">
@@ -210,7 +218,7 @@ export const ChromeHeaderTabs: React.FC = () => {
                     setContextMenu(null);
                   }}
                   title={color.name}
-                  className="w-4 h-4 rounded-full border border-slate-700 hover:scale-125 transition-transform shrink-0"
+                  className="w-4 h-4 rounded-full border border-cortex-border hover:scale-125 transition-transform shrink-0"
                   style={{ backgroundColor: color.hex }}
                 />
               ))}
@@ -223,9 +231,9 @@ export const ChromeHeaderTabs: React.FC = () => {
               const tab = store.tabs.find((t) => t.id === contextMenu.tabId);
               if (tab) startEditing(tab);
             }}
-            className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-slate-800 text-left transition-colors"
+            className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-cortex-surface2 text-left transition-colors"
           >
-            <Edit3 className="w-3.5 h-3.5 text-cyan-400" />
+            <Edit3 className="w-3.5 h-3.5 text-cortex-accent" />
             <span>Rename Tab</span>
           </button>
 
@@ -234,13 +242,13 @@ export const ChromeHeaderTabs: React.FC = () => {
               duplicateTab(contextMenu.tabId);
               setContextMenu(null);
             }}
-            className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-slate-800 text-left transition-colors"
+            className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-cortex-surface2 text-left transition-colors"
           >
-            <Copy className="w-3.5 h-3.5 text-indigo-400" />
+            <Copy className="w-3.5 h-3.5 text-cortex-accent" />
             <span>Duplicate Tab</span>
           </button>
 
-          <div className="my-1 border-t border-slate-800" />
+          <div className="my-1 border-t border-cortex-border" />
 
           <button
             onClick={() => {
@@ -248,9 +256,9 @@ export const ChromeHeaderTabs: React.FC = () => {
               setContextMenu(null);
             }}
             disabled={store.tabs.length <= 1}
-            className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-slate-800 text-left transition-colors disabled:opacity-40 disabled:pointer-events-none"
+            className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-cortex-surface2 text-left transition-colors disabled:opacity-40 disabled:pointer-events-none"
           >
-            <XCircle className="w-3.5 h-3.5 text-amber-400" />
+            <XCircle className="w-3.5 h-3.5 text-cortex-warning" />
             <span>Close Other Tabs</span>
           </button>
 
@@ -259,7 +267,7 @@ export const ChromeHeaderTabs: React.FC = () => {
               closeTab(contextMenu.tabId);
               setContextMenu(null);
             }}
-            className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-red-950/40 text-red-400 hover:text-red-300 text-left transition-colors"
+            className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-red-950/40 text-cortex-error text-left transition-colors"
           >
             <X className="w-3.5 h-3.5" />
             <span>Close Tab</span>

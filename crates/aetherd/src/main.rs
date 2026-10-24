@@ -1033,6 +1033,119 @@ async fn process_request(ctx: &DaemonContext, req: IpcRequest) -> IpcResponse {
             }
         }
 
+        IpcRequestPayload::SaveAiProviderConfig {
+            provider,
+            api_key,
+            model,
+            base_url,
+            display_name,
+            protocol,
+        } => {
+            match aetherd::ai_pilot::update_provider_setting(
+                &provider,
+                &api_key,
+                &model,
+                base_url,
+                display_name,
+                protocol,
+            ) {
+                Ok(config) => IpcResponse::ok(req_id, IpcResponsePayload::AiProviderConfig(config)),
+                Err(e) => IpcResponse::err(req_id, "SAVE_AI_PROVIDER_FAILED", e.to_string()),
+            }
+        }
+
+        IpcRequestPayload::DeleteAiProviderConfig { provider } => {
+            match aetherd::ai_pilot::delete_provider_setting(&provider) {
+                Ok(config) => IpcResponse::ok(req_id, IpcResponsePayload::AiProviderConfig(config)),
+                Err(e) => IpcResponse::err(req_id, "DELETE_AI_PROVIDER_FAILED", e.to_string()),
+            }
+        }
+
+        IpcRequestPayload::GetAiProviderConfig => {
+            match aetherd::ai_pilot::load_provider_config() {
+                Ok(config) => IpcResponse::ok(req_id, IpcResponsePayload::AiProviderConfig(config)),
+                Err(e) => IpcResponse::err(req_id, "GET_AI_PROVIDER_FAILED", e.to_string()),
+            }
+        }
+
+        IpcRequestPayload::RunAiPilotPrompt { pane_id, instruction } => {
+            match aetherd::ai_pilot::run_ai_pilot_cycle(ctx, &pane_id, &instruction).await {
+                Ok(result) => {
+                    IpcResponse::ok(req_id, IpcResponsePayload::AiPilotPromptResult { result })
+                }
+                Err(e) => IpcResponse::err(req_id, "AI_PILOT_EXECUTION_FAILED", e),
+            }
+        }
+
+        IpcRequestPayload::TestAiProviderConnection {
+            provider,
+            api_key,
+            model,
+            base_url,
+        } => {
+            let client = aetherd::ai_pilot::AiPilotClient::new();
+            let settings = aether_protocol::ipc::ProviderSettings {
+                api_key,
+                model,
+                base_url,
+                display_name: None,
+                protocol: None,
+            };
+            match client.test_connection(&provider, &settings).await {
+                Ok(msg) => IpcResponse::ok(
+                    req_id,
+                    IpcResponsePayload::AiProviderTestResult {
+                        success: true,
+                        message: msg,
+                    },
+                ),
+                Err(e) => IpcResponse::ok(
+                    req_id,
+                    IpcResponsePayload::AiProviderTestResult {
+                        success: false,
+                        message: e,
+                    },
+                ),
+            }
+        }
+
+        IpcRequestPayload::AiChat {
+            provider,
+            model,
+            prompt,
+            system_prompt,
+        } => {
+            let config = aetherd::ai_pilot::load_provider_config().unwrap_or_default();
+            let p_key = provider.to_lowercase();
+            let mut settings = config.providers.get(&p_key).cloned().unwrap_or_else(|| {
+                aether_protocol::ipc::ProviderSettings {
+                    api_key: String::new(),
+                    model: model.clone().unwrap_or_else(|| "gpt-4o".to_string()),
+                    base_url: None,
+                    display_name: None,
+                    protocol: None,
+                }
+            });
+            if let Some(m) = model {
+                if !m.trim().is_empty() {
+                    settings.model = m;
+                }
+            }
+            let client = aetherd::ai_pilot::AiPilotClient::new();
+            let mut messages = Vec::new();
+            if let Some(sys) = system_prompt {
+                messages.push(aetherd::ai_pilot::ChatMessage::system(sys));
+            }
+            messages.push(aetherd::ai_pilot::ChatMessage::user(prompt));
+            match client.chat_completion(&provider, &settings, &messages, &[]).await {
+                Ok(resp) => {
+                    let text = resp.content.unwrap_or_default();
+                    IpcResponse::ok(req_id, IpcResponsePayload::AiChatResult { content: text })
+                }
+                Err(err) => IpcResponse::err(req_id, "AI_CHAT_ERROR", err),
+            }
+        }
+
         IpcRequestPayload::SubscribeEvents { .. } => {
             IpcResponse::ok(req_id, IpcResponsePayload::Success)
         }

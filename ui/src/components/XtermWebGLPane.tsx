@@ -3,7 +3,8 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { ImageAddon } from '@xterm/addon-image';
-import { resizePanePty, sendPtyInput, getPaneScrollback } from '../stores/aetherStore';
+import { resizePanePty, sendPtyInput, getPaneScrollback, useAetherStore } from '../stores/aetherStore';
+import { AETHER_THEMES } from '../utils/themes';
 
 interface Props {
   paneId: string;
@@ -69,6 +70,7 @@ export const XtermWebGLPane: React.FC<Props> = ({
   onFocus,
   registerTermWriter,
 }) => {
+  const store = useAetherStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -76,7 +78,8 @@ export const XtermWebGLPane: React.FC<Props> = ({
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // 1. Initialize Xterm with Tokyo Night Dark Theme
+    // 1. Initialize Xterm with active theme colors
+    const activeTheme = AETHER_THEMES.find((t) => t.id === store.currentTheme) || AETHER_THEMES[0];
     const term = new Terminal({
       cursorBlink: true,
       cursorStyle: 'bar',
@@ -91,28 +94,7 @@ export const XtermWebGLPane: React.FC<Props> = ({
         getCellSizePixels: true,
         getWinSizeChars: true,
       },
-      theme: {
-        background: '#16161e00', // Transparent for Wayland compositor
-        foreground: '#c0caf5',
-        cursor: '#c0caf5',
-        selectionBackground: '#283457',
-        black: '#15161e',
-        red: '#f7768e',
-        green: '#9ece6a',
-        yellow: '#e0af68',
-        blue: '#7aa2f7',
-        magenta: '#bb9af7',
-        cyan: '#7dcfff',
-        white: '#a9b1d6',
-        brightBlack: '#414868',
-        brightRed: '#f7768e',
-        brightGreen: '#9ece6a',
-        brightYellow: '#e0af68',
-        brightBlue: '#7aa2f7',
-        brightMagenta: '#bb9af7',
-        brightCyan: '#7dcfff',
-        brightWhite: '#c0caf5',
-      },
+      theme: activeTheme.xterm,
     });
 
     // 2. Load Fit Addon & Image Addon (SIXEL & iTerm Image Protocol)
@@ -474,6 +456,13 @@ export const XtermWebGLPane: React.FC<Props> = ({
       term.dispose();
     };
   }, [paneId]);
+
+  // Reactively synchronize terminal theme colors on theme toggle
+  useEffect(() => {
+    if (!termRef.current) return;
+    const currentActiveTheme = AETHER_THEMES.find((t) => t.id === store.currentTheme) || AETHER_THEMES[0];
+    termRef.current.options.theme = currentActiveTheme.xterm;
+  }, [store.currentTheme]);
 
   const focusTerminal = () => {
     if (termRef.current) {

@@ -4,7 +4,7 @@ Thank you for your interest in contributing to **AetherTerminal**! We welcome bu
 
 ---
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 AetherTerminal is organized as a Cargo workspace with a TypeScript frontend:
 
@@ -17,7 +17,7 @@ AetherTerminal is organized as a Cargo workspace with a TypeScript frontend:
 
 ---
 
-## 🛠️ Prerequisites
+## Prerequisites
 
 To build and run AetherTerminal locally on Linux, ensure you have:
 
@@ -50,7 +50,7 @@ To build and run AetherTerminal locally on Linux, ensure you have:
 
 ---
 
-## 🚀 Development Workflow
+## Development Workflow
 
 ### 1. Clone & Setup
 
@@ -82,7 +82,7 @@ cargo build --release --workspace
 
 ---
 
-## 📜 Pull Request Guidelines
+## Pull Request Guidelines
 
 1. **Branch Naming**: Use descriptive branch names:
    - `feature/chrome-tab-drag`

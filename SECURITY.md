@@ -2,13 +2,13 @@
 
 ## Supported Versions
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
+| Version | Supported |
+| ------- | --------- |
+| 0.1.x   | Yes       |
 
 ---
 
-## 🔒 Security Architecture
+## Security Architecture
 
 AetherTerminal is designed for high-concurrency development with autonomous AI coding agents. Security is enforced through multiple layers:
 
@@ -28,7 +28,7 @@ AetherTerminal is designed for high-concurrency development with autonomous AI c
 
 ---
 
-## 🛡️ Reporting a Vulnerability
+## Reporting a Vulnerability
 
 If you discover a potential security vulnerability within AetherTerminal, please report it responsibly:
 

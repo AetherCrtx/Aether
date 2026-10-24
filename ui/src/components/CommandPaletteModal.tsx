@@ -21,6 +21,7 @@ import {
   sendPtyInput,
   createSnapshot,
   toggleThemeModal,
+  toggleAiAssistant,
 } from '../stores/aetherStore';
 import {
   Search,
@@ -77,6 +78,15 @@ export const CommandPaletteModal: React.FC = () => {
         shortcut: 'Ctrl+Space',
         icon: <Sparkles className="w-4 h-4 text-cyan-400" />,
         action: () => toggleOrchestrator(true),
+      },
+      {
+        id: 'toggle-ai-assistant',
+        title: 'Toggle AI Assistant Panel',
+        description: 'Open or close side-by-side AetherCortex AI conversation panel',
+        category: 'Agents & AI',
+        shortcut: 'Cmd+Shift+A',
+        icon: <Sparkles className="w-4 h-4 text-[#00F0FF]" />,
+        action: () => toggleAiAssistant(),
       },
       {
         id: 'aether-workflows',

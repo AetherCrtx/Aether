@@ -1,4 +1,4 @@
-# ⚡ AetherTerminal
+# AetherTerminal
 
 > **Multi-CLI Agentic Coding Orchestration Terminal with Shared Collective Memory ("One Brain"), Chrome-Style Multitab Headers, Background Terminals, Git Worktree Isolation, and Bi-directional Obsidian Vault Sync.**
 
@@ -6,7 +6,7 @@ AetherTerminal is a lightweight, high-performance Linux GUI terminal emulator pu
 
 ---
 
-## 🌟 Key Architectural Pillars
+## Key Architectural Pillars
 
 ```mermaid
 flowchart TD
@@ -85,7 +85,7 @@ flowchart TD
 
 ---
 
-## ⌨️ Global Keybindings
+## Global Keybindings
 
 | Keybinding | Action | Description |
 |---|---|---|
@@ -109,7 +109,7 @@ flowchart TD
 
 ---
 
-## 🛠️ Built-in MCP Tools (`aether-mcp`)
+## Built-in MCP Tools (`aether-mcp`)
 
 The local MCP server communicates with CLI agents via standard JSON-RPC 2.0 over `stdio`:
 
@@ -125,7 +125,7 @@ The local MCP server communicates with CLI agents via standard JSON-RPC 2.0 over
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - **Linux** (Arch, Fedora, Ubuntu/Debian) with X11 or Wayland
@@ -166,7 +166,7 @@ cargo build --release --workspace
 
 ---
 
-## 📂 Repository Layout
+## Repository Layout
 
 ```
 .
@@ -205,5 +205,5 @@ cargo build --release --workspace
 
 ---
 
-## 📄 License
+## License
 Licensed under the [MIT License](LICENSE).

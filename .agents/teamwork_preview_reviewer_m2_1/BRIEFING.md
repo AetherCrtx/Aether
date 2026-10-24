@@ -1,60 +1,51 @@
-# BRIEFING — 2026-10-24T03:58:45Z
+# BRIEFING — 2026-10-24T17:52:30+07:00
 
 ## Mission
-Review Milestone 2 changes (command classifier, ModernInputBar dynamic mode badge, routePromptToAgent), verify test and build executions, stress-test assumptions and failure modes, and issue verdict.
+Review Milestone 2 deliverables (AI provider matrix, aetherStore, AiSettingsModal, test coverage, builds) and issue independent verdict.
 
 ## 🔒 My Identity
-- Archetype: reviewer-critic
+- Archetype: reviewer_critic
 - Roles: reviewer, critic
 - Working directory: /home/rasshqa/projects/Elliot/.agents/teamwork_preview_reviewer_m2_1
-- Original parent: b4b0fa97-873a-4908-ab8b-7c3e9bde85fa
-- Milestone: Milestone 2 (R2)
+- Original parent: ead1cd55-cf02-46d6-87a8-94f126e8c82f
+- Milestone: Milestone 2 Review
 - Instance: 1 of 1
 
 ## 🔒 Key Constraints
 - Review-only — do NOT modify implementation code
-- Integrity violations check: hardcoded test results, facade implementations, bypassed tasks, fabricated logs
-- Report findings with evidence and issue VERDICT: APPROVE or VERDICT: REQUEST_CHANGES
+- Integrity check: no hardcoded test outputs, no fake facades, no bypassing tasks
+- Strict copy restriction: ZERO occurrences of 'BYOK'
+- Neo-brutalist styling: sharp borders, flat surfaces, cosmic cyan accents, zero glassmorphism, zero emojis
 
 ## Current Parent
-- Conversation ID: b4b0fa97-873a-4908-ab8b-7c3e9bde85fa
-- Updated: 2026-10-24T03:58:45Z
+- Conversation ID: ead1cd55-cf02-46d6-87a8-94f126e8c82f
+- Updated: 2026-10-24T17:48:00+07:00
 
 ## Review Scope
-- **Files to review**:
-  - `ui/src/utils/commandClassifier.ts`
-  - `ui/src/components/ModernInputBar.tsx`
-  - `ui/src/stores/aetherStore.ts`
-  - `ui/tests/commandClassifier.test.ts`
-- **Interface contracts**: PROJECT.md / ORIGINAL_REQUEST.md
-- **Review criteria**: correctness, edge-case classification, TypeScript types, build validity, agent routing
+- **Files to review**: ui/src/stores/aetherStore.ts, ui/src/components/AiSettingsModal.tsx, ui/tests/aiProvidersM2.test.ts, /home/rasshqa/projects/Elliot/.agents/teamwork_preview_worker_m2_cortex/handoff.md
+- **Interface contracts**: /home/rasshqa/projects/Elliot/PROJECT.md, /home/rasshqa/projects/Elliot/.agents/ORIGINAL_REQUEST.md
+- **Review criteria**: Provider matrix, single source of truth with localStorage, custom provider CRUD, connection testing, styling compliance, BYOK ban, build & tests passing.
 
 ## Review Checklist
-- **Items reviewed**:
-  - `ui/src/utils/commandClassifier.ts` — verified heuristics, tokenizer, stop-word frequency, CLI binary set, unquoting.
-  - `ui/src/components/ModernInputBar.tsx` — verified real-time `classifyCommand` invocation, dynamic badge rendering (`$ CMD`, `✨ AI (Auto)`, `✨ AI (Pinned)`), tooltip with reason and confidence, click toggle override, enter submit logic.
-  - `ui/src/stores/aetherStore.ts` — verified `routePromptToAgent`, `#` stripping, target agent resolution, active pane switching, PTY streaming.
-  - `ui/tests/commandClassifier.test.ts` — verified all 20 unit test suites.
+- **Items reviewed**: ui/src/stores/aetherStore.ts, ui/src/components/AiSettingsModal.tsx, ui/tests/aiProvidersM2.test.ts, crates/aether-gui/src/ipc_bridge.rs, crates/aetherd/src/ai_pilot/client.rs
 - **Verdict**: APPROVE
-- **Unverified claims**: none remaining (all verified independently via tool execution and code inspection).
+- **Unverified claims**: none remaining; all claims independently verified
 
 ## Attack Surface
 - **Hypotheses tested**:
-  - Quoted arguments with interrogatives (e.g. `git commit -m "why did this fail?"`) -> PASSED (unquoted string stripping preserves shell mode).
-  - CLI binary followed by conversational words (e.g. `cat the file`, `find all files`) -> PASSED (conversational sentence detection triggers AI mode).
-  - Empty and whitespace inputs -> PASSED (defaults to shell, 1.0 confidence).
-  - Single-word inputs (e.g. `status`, `test`) -> PASSED (defaults to shell, 0.65-0.70 confidence).
-  - Explicit prefix `#` and `$ ` -> PASSED (explicit override takes precedence with 1.0 confidence).
-  - Interrogative collision with POSIX utility `which` and `who` -> IDENTIFIED (classified as AI due to `NL_INTERROGATIVES` taking precedence over `COMMON_SHELL_BINARIES`).
-  - Agent pane cold-start timing in `routePromptToAgent` -> IDENTIFIED (500ms delay for newly spawned agent panes).
-- **Vulnerabilities found**: No security vulnerabilities or integrity violations. 2 minor edge-case findings documented.
-- **Untested angles**: Hardware-constrained devices where PTY spawn exceeds 500ms.
+  - Malformed custom provider URL validation: verified regex rejection
+  - Custom provider deletion while currently active: verified fallback to openai/gpt-4o
+  - Ollama missing API key during test connection: verified success without key requirement
+  - Prohibited 'BYOK' presence in UI source and compiled bundle: verified 0 occurrences
+  - Emoji presence in M2 code/markup: verified 0 occurrences
+  - Build failure under production rollup/tsc: verified exit code 0
+  - Rust workspace check and tests: verified 86 passed, 0 failed
+- **Vulnerabilities found**: none blocking
+- **Untested angles**: physical network timeouts to live paid third-party APIs (inherent to offline review)
 
 ## Key Decisions Made
-- Concluded Milestone 2 review with VERDICT: APPROVE.
+- Confirmed full alignment of Milestone 2 deliverables with specification requirements R4 and R5 in ORIGINAL_REQUEST.md and PROJECT.md
+- Issued verdict: APPROVE
 
 ## Artifact Index
-- `/home/rasshqa/projects/Elliot/.agents/teamwork_preview_reviewer_m2_1/DISPATCH.md` — Dispatch instructions
-- `/home/rasshqa/projects/Elliot/.agents/teamwork_preview_reviewer_m2_1/BRIEFING.md` — Situational awareness
-- `/home/rasshqa/projects/Elliot/.agents/teamwork_preview_reviewer_m2_1/progress.md` — Progress tracker and liveness heartbeat
-- `/home/rasshqa/projects/Elliot/.agents/teamwork_preview_reviewer_m2_1/handoff.md` — Final review report
+- /home/rasshqa/projects/Elliot/.agents/teamwork_preview_reviewer_m2_1/handoff.md — final review report

@@ -7,6 +7,22 @@ export default {
   theme: {
     extend: {
       colors: {
+        cortex: {
+          bg: 'var(--cortex-bg)',
+          bgAlt: 'var(--cortex-bg-alt)',
+          surface1: 'var(--cortex-surface-1)',
+          surface2: 'var(--cortex-surface-2)',
+          border: 'var(--cortex-border)',
+          borderStrong: 'var(--cortex-border-strong)',
+          text: 'var(--cortex-text)',
+          textMuted: 'var(--cortex-text-muted)',
+          accent: 'var(--cortex-accent)',
+          accentHover: 'var(--cortex-accent-hover)',
+          accentMuted: 'var(--cortex-accent-muted)',
+          error: 'var(--cortex-error)',
+          success: 'var(--cortex-success)',
+          warning: 'var(--cortex-warning)',
+        },
         tokyo: {
           bg: '#1a1b26',
           bgDark: '#16161e',
@@ -24,6 +40,7 @@ export default {
         }
       },
       fontFamily: {
+        sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],
         mono: ['"JetBrainsMono Nerd Font"', '"FiraCode Nerd Font"', 'monospace'],
       }
     },

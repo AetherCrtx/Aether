@@ -9,7 +9,7 @@
 
 ## Status Fase 1: 3 Bug Kritis (SEBAGIAN SELESAI)
 
-### ✅ Bug 2: Default CWD ke `/` (FIXED & VERIFIED)
+### Bug 2: Default CWD ke `/` (FIXED & VERIFIED)
 **Masalah:** Pane baru landing di `$HOME` bukan `/`.
 
 **Root cause:** Fallback lama pakai `resolve_default_home_dir()`.
@@ -29,7 +29,7 @@
 
 ---
 
-### ✅ Bug 3: Lag Parah (FIXED & VERIFIED)
+### Bug 3: Lag Parah (FIXED & VERIFIED)
 **Masalah:** UI freeze saat output tinggi (`cargo build`, `tail -f`).
 
 **Root cause:**
@@ -53,7 +53,7 @@
 
 ---
 
-### ✅ Bug 1: Fastfetch Double (FIXED & FULLY VERIFIED)
+### Bug 1: Fastfetch Double (FIXED & FULLY VERIFIED)
 
 **Masalah:** Output `fastfetch` ter-render dua kali saat spawn pane baru.
 
@@ -87,18 +87,18 @@ Penyebab sejati bukan timing race murni, melainkan duplikasi data struktural ant
 **Verified:**
 - `cargo test --workspace`: 32 passed.
 - `npx tsc --noEmit`: 0 error.
-- `npm run build`: ✓ sukses.
+- `npm run build`: sukses.
 - `cargo build --release -p aetherd -p aether-gui`: Finished in 2m 05s.
 
 ---
 
-## ✅ Fase 1 Verifikasi Akhir
+## Fase 1 Verifikasi Akhir
 
 ```bash
 cargo check --workspace    # 0 error, 0 warning
 cargo test --workspace     # 32 passed, 0 failed
 npx tsc --noEmit           # 0 error
-npm run build              # ✓ 3.82s
+npm run build              # 3.82s
 cargo build --release      # Finished 1m 31s
 ```
 
@@ -139,56 +139,56 @@ M  ui/src/stores/aetherStore.ts                ← gate decode + getOpenCommandB
 
 ---
 
-## 🏆 Fase 2: Integrasi Fitur Warp (SELESAI PENUH - VICTORY CONFIRMED)
+## Fase 2: Integrasi Fitur Warp (SELESAI PENUH - VICTORY CONFIRMED)
 
 **Referensi:** `.config/Hermes/composer-pastes/pasted_content_2026-10-23_18-33-19-778_13c5df.txt` & `TEST_READY.md`  
 **Hasil Audit Independen:** **VICTORY CONFIRMED**
 
-### ✅ Fitur yang Selesai di Fase 2
-- ✅ **Command Palette (`Ctrl+P` / `Cmd+P`)**:
+### Fitur yang Selesai di Fase 2
+- **Command Palette (`Ctrl+P` / `Cmd+P`)**:
   - Modal fuzzy search untuk seluruh action: Agents & AI, Panes & Splits, Tabs, Git & Vault, dan Terminal.
   - Keyboard navigation (`ArrowUp`/`ArrowDown`/`Enter`/`Escape`).
-- ✅ **Split Panes (`Cmd+D` / `Cmd+Shift+D`)**:
+- **Split Panes (`Cmd+D` / `Cmd+Shift+D`)**:
   - Shortcut `Cmd+D` (split vertical) dan `Cmd+Shift+D` (split horizontal).
   - Bubbling key events diperbaiki di `XtermWebGLPane.tsx` agar xterm tidak mengonsumsi hotkeys global.
-- ✅ **Custom Tabs (`ChromeHeaderTabs.tsx`)**:
+- **Custom Tabs (`ChromeHeaderTabs.tsx`)**:
   - Right-click context menu dengan 8 preset warna tab (Cyan, Blue, Purple, Pink, Emerald, Amber, Rose, Default).
   - Indikator warna tab dinamis (glowing pip + colored top-border).
   - Fitur "Duplicate Tab", "Close Other Tabs", dan double-click inline renaming.
-- ✅ **Environment & Git Charms (`ModernInputBar.tsx`)**:
+- **Environment & Git Charms (`ModernInputBar.tsx`)**:
   - Chip CWD breadcrumbs / short directory.
   - Git Branch charm dengan visual badge.
-  - Runtimes charm (Rust `🦀`, Node `⬢`).
-  - Last Command Exit Code charm (`✓ 0` / `✗ N`).
-- ✅ **Smart Autocomplete & Ghost Text (`ModernInputBar.tsx`)**:
+  - Runtimes charm (Rust, Node).
+  - Last Command Exit Code charm (`0` / `N`).
+- **Smart Autocomplete & Ghost Text (`ModernInputBar.tsx`)**:
   - Ghost-text autosuggestion berbasis `recentCommandsFor` + fallback ke kumpulan preset CLI umum (`cargo check`, `npm run dev`, `git status`, dll).
   - Auto-complete acceptance via `Tab` atau `Right Arrow` (saat kursor di akhir teks).
-- ✅ **Interactive Diff View (`DiffGatekeeperModal.tsx`)**:
+- **Interactive Diff View (`DiffGatekeeperModal.tsx`)**:
   - Sidebar per-file selection untuk memfilter unified diff hanya pada file yang dipilih.
   - Search filter untuk list modified files.
   - Tombol "Copy Diff" ke clipboard dengan visual checkmark.
-- ✅ **Theming & Appearance Engine (`Cmd+,` / `Ctrl+,`) (`ThemeModal.tsx` & `themes.ts`)**:
+- **Theming & Appearance Engine (`Cmd+,` / `Ctrl+,`) (`ThemeModal.tsx` & `themes.ts`)**:
   - 5 built-in theme presets: Tokyo Night, Catppuccin Mocha, Dracula, Nord, Cyberpunk Neon.
   - Window transparency/opacity slider (0.4 - 1.0) untuk Wayland / Hyprland compositor blur.
   - Live terminal palette preview & persistent state via `localStorage`.
-- ✅ **Aether Drive Sidebar (`Cmd+\` / `Ctrl+\`) (`AetherDriveSidebar.tsx`)**:
+- **Aether Drive Sidebar (`Cmd+\` / `Ctrl+\`) (`AetherDriveSidebar.tsx`)**:
   - Collapsible, responsive drawer docked di samping `TerminalGrid`.
   - 3 sub-panels terintegrasi: Workspace File Tree (dengan File Inspection Card: Open in Terminal, Copy Path, Ask AI), Workspace Text Search (ripgrep/Rust fallback), dan Saved Workflows runner.
   - Backend Tauri IPC commands di `crates/aether-gui/src/ipc_bridge.rs`: `cmd_read_workspace_directory`, `cmd_search_workspace_files`, `cmd_read_workspace_file` dengan canonical traversal protection.
-- ✅ **Intelligent Natural Language vs Shell Classifier (`commandClassifier.ts`)**:
+- **Intelligent Natural Language vs Shell Classifier (`commandClassifier.ts`)**:
   - 13-tier zero-latency deterministic heuristic classifier engine.
-  - Visual mode badge dinamis (`$ CMD` vs `✨ AI (Auto)` / `# AI`), reason tooltip, dan manual mode override.
+  - Visual mode badge dinamis (`$ CMD` vs `AI (Auto)` / `# AI`), reason tooltip, dan manual mode override.
   - Auto-routing `routePromptToAgent` tanpa perlu `#` prefix manual atau memicu shell syntax error.
-- ✅ **Persistent Terminal & Remote Session Resilience (`pty_manager.rs`)**:
+- **Persistent Terminal & Remote Session Resilience (`pty_manager.rs`)**:
   - Injeksi SSH keepalive otomatis (`ServerAliveInterval=15`, `ServerAliveCountMax=3`, `TCPKeepAlive=yes`).
   - PTY session retention & 512KB ring buffer preservation saat proses anak exit untuk kontinuitas scrollback.
 
-### 📊 Hasil Pengujian & Verifikasi Akhir
-- **Cargo Tests:** `cargo test --workspace` ➔ **79/79 passing** (100% green, 0 failed).
-- **Cargo Check:** `cargo check --workspace` ➔ 0 error, 0 warning.
-- **UI Unit & E2E Tests:** `node --test tests/*.test.ts` ➔ **71/71 passing** (100% green, 0 failed).
-- **Frontend Build:** `npx tsc --noEmit && npm run build` ➔ **Exit code 0**, 1599 modules built dalam 8.32s.
-- **Knowledge Graph:** `graphify update .` ➔ 2086 nodes, 3839 edges tersinkronisasi bersih.
+### Hasil Pengujian & Verifikasi Akhir
+- **Cargo Tests:** `cargo test --workspace` -> **79/79 passing** (100% green, 0 failed).
+- **Cargo Check:** `cargo check --workspace` -> 0 error, 0 warning.
+- **UI Unit & E2E Tests:** `node --test tests/*.test.ts` -> **71/71 passing** (100% green, 0 failed).
+- **Frontend Build:** `npx tsc --noEmit && npm run build` -> **Exit code 0**, 1599 modules built dalam 8.32s.
+- **Knowledge Graph:** `graphify update .` -> 2086 nodes, 3839 edges tersinkronisasi bersih.
 
 2. **Test manual wajib:**
    ```bash
@@ -215,7 +215,7 @@ M  ui/src/stores/aetherStore.ts                ← gate decode + getOpenCommandB
 
 ---
 
-## 🔧 Quick Start untuk Session Baru
+## Quick Start untuk Session Baru
 
 ```bash
 cd /home/rasshqa/projects/Elliot
@@ -247,11 +247,11 @@ cd ui && npx tsc --noEmit && npm run build
 
 | Item | Status | Next Action |
 |---|---|---|
-| Bug 2 (CWD `/`) | ✅ Fixed | None |
-| Bug 3 (Lag) | ✅ Fixed | None |
-| Bug 1 (Fastfetch double) | ✅ Fixed | Selesai via Monotonic Byte-Offset Stream Deduplication |
-| Fase 2 fitur Warp | 🚀 Ready to start | Prioritize Command Palette (`Cmd+P`) → Split Panes (`Cmd+D`) |
-| Git commit | 📦 Ready to commit | Fase 1 bug fixes 100% complete & verified |
-| Release binary | ✅ Fresh | Tested & built in release mode |
+| Bug 2 (CWD `/`) | Fixed | None |
+| Bug 3 (Lag) | Fixed | None |
+| Bug 1 (Fastfetch double) | Fixed | Selesai via Monotonic Byte-Offset Stream Deduplication |
+| Fase 2 fitur Warp | Ready to start | Prioritize Command Palette (`Cmd+P`) → Split Panes (`Cmd+D`) |
+| Git commit | Ready to commit | Fase 1 bug fixes 100% complete & verified |
+| Release binary | Fresh | Tested & built in release mode |
 
 **Critical path:** Fase 1 selesai 100% → siap commit & mulai Fase 2 (Command Palette `Cmd+P` first).

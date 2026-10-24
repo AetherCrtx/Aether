@@ -130,6 +130,38 @@ pub enum IpcRequestPayload {
     // Real-Time Event Subscription
     SubscribeEvents { workspace_id: Option<String> },
     Ping,
+
+    // AI Pilot and Provider Settings
+    SaveAiProviderConfig {
+        provider: String,
+        api_key: String,
+        model: String,
+        base_url: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        display_name: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        protocol: Option<String>,
+    },
+    DeleteAiProviderConfig {
+        provider: String,
+    },
+    GetAiProviderConfig,
+    RunAiPilotPrompt {
+        pane_id: String,
+        instruction: String,
+    },
+    TestAiProviderConnection {
+        provider: String,
+        api_key: String,
+        model: String,
+        base_url: Option<String>,
+    },
+    AiChat {
+        provider: String,
+        model: Option<String>,
+        prompt: String,
+        system_prompt: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -315,6 +347,105 @@ pub enum IpcResponsePayload {
     ObsidianMemoryAppended,
     ObsidianSearchResults(Vec<ObsidianSearchResult>),
     WorkflowList(Vec<WorkflowDefinition>),
+    AiProviderConfig(ProviderConfig),
+    AiPilotPromptResult {
+        result: String,
+    },
+    AiProviderTestResult {
+        success: bool,
+        message: String,
+    },
+    AiChatResult {
+        content: String,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ProviderSettings {
+    pub api_key: String,
+    pub model: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub protocol: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ProviderConfig {
+    pub default_provider: String,
+    pub providers: HashMap<String, ProviderSettings>,
+}
+
+impl Default for ProviderConfig {
+    fn default() -> Self {
+        let mut providers = HashMap::new();
+        providers.insert(
+            "openai".to_string(),
+            ProviderSettings {
+                api_key: String::new(),
+                model: "gpt-4o".to_string(),
+                base_url: Some("https://api.openai.com/v1".to_string()),
+                display_name: Some("OpenAI".to_string()),
+                protocol: Some("openai".to_string()),
+            },
+        );
+        providers.insert(
+            "anthropic".to_string(),
+            ProviderSettings {
+                api_key: String::new(),
+                model: "claude-3-5-sonnet-20241022".to_string(),
+                base_url: Some("https://api.anthropic.com/v1".to_string()),
+                display_name: Some("Anthropic".to_string()),
+                protocol: Some("anthropic".to_string()),
+            },
+        );
+        providers.insert(
+            "gemini".to_string(),
+            ProviderSettings {
+                api_key: String::new(),
+                model: "gemini-1.5-pro".to_string(),
+                base_url: Some("https://generativelanguage.googleapis.com/v1beta/openai".to_string()),
+                display_name: Some("Google Gemini".to_string()),
+                protocol: Some("openai".to_string()),
+            },
+        );
+        providers.insert(
+            "groq".to_string(),
+            ProviderSettings {
+                api_key: String::new(),
+                model: "llama-3.3-70b-versatile".to_string(),
+                base_url: Some("https://api.groq.com/openai/v1".to_string()),
+                display_name: Some("Groq".to_string()),
+                protocol: Some("openai".to_string()),
+            },
+        );
+        providers.insert(
+            "openrouter".to_string(),
+            ProviderSettings {
+                api_key: String::new(),
+                model: "anthropic/claude-3.5-sonnet".to_string(),
+                base_url: Some("https://openrouter.ai/api/v1".to_string()),
+                display_name: Some("OpenRouter".to_string()),
+                protocol: Some("openai".to_string()),
+            },
+        );
+        providers.insert(
+            "ollama".to_string(),
+            ProviderSettings {
+                api_key: String::new(),
+                model: "llama3:latest".to_string(),
+                base_url: Some("http://localhost:11434/v1".to_string()),
+                display_name: Some("Ollama (Local)".to_string()),
+                protocol: Some("openai".to_string()),
+            },
+        );
+        Self {
+            default_provider: "openrouter".to_string(),
+            providers,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -430,6 +561,12 @@ pub enum IpcEvent {
     ObsidianNoteUpdated {
         workspace_id: String,
         relative_path: String,
+    },
+    /// Step-by-step progress event emitted by the autonomous AI pilot
+    AiPilotEvent {
+        pane_id: String,
+        step: String,
+        details: Option<String>,
     },
 }
 

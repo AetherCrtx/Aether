@@ -12,6 +12,8 @@ use ipc_bridge::{
     cmd_resize_pane, cmd_rollback_snapshot, cmd_send_pty_input, cmd_spawn_pane,
     cmd_update_obsidian_task, cmd_validate_tool,
     cmd_read_workspace_directory, cmd_search_workspace_files, cmd_read_workspace_file,
+    cmd_save_ai_provider_config, cmd_get_ai_provider_config, cmd_run_ai_pilot_prompt, cmd_test_ai_provider,
+    cmd_delete_ai_provider_config, cmd_ai_chat,
     start_event_listener, GuiBridgeState,
 };
 use tracing::info;
@@ -65,7 +67,13 @@ fn main() {
             cmd_validate_tool,
             cmd_read_workspace_directory,
             cmd_search_workspace_files,
-            cmd_read_workspace_file
+            cmd_read_workspace_file,
+            cmd_save_ai_provider_config,
+            cmd_get_ai_provider_config,
+            cmd_run_ai_pilot_prompt,
+            cmd_test_ai_provider,
+            cmd_delete_ai_provider_config,
+            cmd_ai_chat
         ])
         .build(tauri::generate_context!())
         .expect("error while building AetherTerminal application")

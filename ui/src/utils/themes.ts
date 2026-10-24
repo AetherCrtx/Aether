@@ -36,6 +36,76 @@ export interface AetherTheme {
 
 export const AETHER_THEMES: AetherTheme[] = [
   {
+    id: 'aethercortex-dark',
+    name: 'AetherCortex Dark',
+    description: 'Flagship Neo-Brutalist Dark theme with Cosmic Cyan accents and crisp contrast',
+    accent: '#00F0FF',
+    bg: '#0B1013',
+    bgDark: '#050809',
+    panel: '#0E1418',
+    border: '#162026',
+    fg: '#F8F9FA',
+    cursor: '#00F0FF',
+    selection: '#00F0FF33',
+    xterm: {
+      background: '#050809',
+      foreground: '#F8F9FA',
+      cursor: '#00F0FF',
+      selectionBackground: '#00F0FF33',
+      black: '#050809',
+      red: '#FF3B5C',
+      green: '#00E599',
+      yellow: '#FFB800',
+      blue: '#00F0FF',
+      magenta: '#C084FC',
+      cyan: '#00F0FF',
+      white: '#F8F9FA',
+      brightBlack: '#1F2E36',
+      brightRed: '#FF5E7A',
+      brightGreen: '#2BEAB3',
+      brightYellow: '#FFC933',
+      brightBlue: '#38F4FF',
+      brightMagenta: '#D8B4FE',
+      brightCyan: '#66F6FF',
+      brightWhite: '#FFFFFF',
+    },
+  },
+  {
+    id: 'aethercortex-light',
+    name: 'AetherCortex Light',
+    description: 'Flagship Neo-Brutalist Light theme with crisp contrast and high-contrast Cosmic Cyan',
+    accent: '#00A3AD',
+    bg: '#F8F9FA',
+    bgDark: '#FFFFFF',
+    panel: '#F1F4F6',
+    border: '#CBD5E1',
+    fg: '#050809',
+    cursor: '#00A3AD',
+    selection: '#00A3AD26',
+    xterm: {
+      background: '#FFFFFF',
+      foreground: '#050809',
+      cursor: '#00A3AD',
+      selectionBackground: '#00A3AD26',
+      black: '#CBD5E1',
+      red: '#DC2626',
+      green: '#059669',
+      yellow: '#D97706',
+      blue: '#0284C7',
+      magenta: '#9333EA',
+      cyan: '#00A3AD',
+      white: '#050809',
+      brightBlack: '#94A3B8',
+      brightRed: '#EF4444',
+      brightGreen: '#10B981',
+      brightYellow: '#F59E0B',
+      brightBlue: '#0EA5E9',
+      brightMagenta: '#A855F7',
+      brightCyan: '#00A3AD',
+      brightWhite: '#0F172A',
+    },
+  },
+  {
     id: 'tokyo-night',
     name: 'Tokyo Night',
     description: 'Clean dark theme celebrating the lights of downtown Tokyo',
@@ -222,6 +292,24 @@ export function applyTheme(themeId: string, opacity: number = 0.95): AetherTheme
   root.style.setProperty('--color-border', theme.border);
   root.style.setProperty('--color-fg', theme.fg);
   root.style.setProperty('--color-blue', theme.accent);
+  root.style.setProperty('--color-cyan', theme.accent);
+  root.style.setProperty('--color-accent', theme.accent);
+
+  root.style.setProperty('--cortex-bg', theme.bgDark);
+  root.style.setProperty('--cortex-bg-alt', theme.bg);
+  root.style.setProperty('--cortex-surface-1', theme.panel);
+  root.style.setProperty('--cortex-border', theme.border);
+  root.style.setProperty('--cortex-text', theme.fg);
+  root.style.setProperty('--cortex-accent', theme.accent);
+
+  const isLight = theme.id.includes('light');
+  if (isLight) {
+    root.classList.add('light-mode');
+    root.classList.remove('dark-mode');
+  } else {
+    root.classList.add('dark-mode');
+    root.classList.remove('light-mode');
+  }
 
   document.body.style.backgroundColor = `rgba(${hexToRgb(theme.bgDark)}, ${opacity})`;
 

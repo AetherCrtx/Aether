@@ -1,3 +1,4 @@
+pub mod ai_pilot;
 pub mod brain_db;
 pub mod config;
 pub mod obsidian_sync;

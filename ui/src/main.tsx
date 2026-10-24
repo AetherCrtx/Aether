@@ -9,27 +9,12 @@ import {
   subscribeAetherEvents,
   refreshSharedContext,
   restoreActivePanes,
-  spawnAgentPane,
-  splitActivePane,
-  equalizeLayout,
-  toggleOrchestrator,
-  openDiffGatekeeper,
-  toggleTimeTravel,
-  toggleObsidianSidebar,
-  toggleBackgroundDrawer,
-  toggleCommandPalette,
-  toggleThemeModal,
-  toggleAetherDriveSidebar,
-  AGENT_PALETTES,
-  setDefaultShell,
-  toggleCustomToolModal,
-  advancePipelineStage,
-  clearPipeline,
 } from './stores/aetherStore';
 
 import { TerminalGrid } from './components/TerminalGrid';
-import { ChromeHeaderTabs } from './components/ChromeHeaderTabs';
-import { AetherDriveSidebar } from './components/AetherDriveSidebar';
+import { TopBar } from './components/TopBar';
+import { PersistentLeftSidebar } from './components/PersistentLeftSidebar';
+
 import { OrchestratorBar } from './components/OrchestratorBar';
 import { DiffGatekeeperModal } from './components/DiffGatekeeperModal';
 import { TimeTravelSlider } from './components/TimeTravelSlider';
@@ -40,29 +25,13 @@ import { BackgroundTasksDrawer } from './components/BackgroundTasksDrawer';
 import { WorkflowsModal } from './components/WorkflowsModal';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { ThemeModal } from './components/ThemeModal';
+import { AiSettingsModal } from './components/AiSettingsModal';
+import { AiAssistantPanel } from './components/AiAssistantPanel';
 
-import {
-  Terminal,
-  Plus,
-  GitBranch,
-  History,
-  Brain,
-  Sparkles,
-  Columns,
-  Rows,
-  Radio,
-  Layers,
-  ChevronDown,
-  SlidersHorizontal,
-  X,
-  Search,
-  Palette,
-  FolderTree,
-} from 'lucide-react';
+import { Radio } from 'lucide-react';
 
 const App: React.FC = () => {
   const store = useAetherStore();
-  const [spawnMenuOpen, setSpawnMenuOpen] = useState(false);
 
   // Map of paneId -> termWriter function
   const termWritersRef = useRef<Map<string, (data: Uint8Array | string, offset?: number) => void>>(new Map());
@@ -123,344 +92,26 @@ const App: React.FC = () => {
   const activePane = store.panes.find((p) => p.id === store.activePaneId);
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-slate-950 text-slate-100 font-mono overflow-hidden">
-      {/* ================= TOP APPLICATION HEADER ================= */}
-      <header className="h-10 bg-slate-900/90 backdrop-blur border-b border-slate-800/80 px-3 flex items-center justify-between z-30 shrink-0 select-none">
-        {/* Brand & Logo */}
-        <div className="flex items-center space-x-2 shrink-0 pr-2 border-r border-slate-800">
-          <img src="/Aether.svg" className="w-4 h-4 rounded-sm object-contain" alt="Aether" />
-          <span className="font-bold text-xs tracking-wider text-slate-100 hidden sm:inline">
-            AETHER<span className="text-cyan-400 font-light">//TERM</span>
-          </span>
-        </div>
+    <div className="flex flex-row h-screen w-screen bg-cortex-bg text-cortex-text font-sans overflow-hidden">
+      {/* ================= PERSISTENT LEFT SIDEBAR ================= */}
+      <PersistentLeftSidebar />
 
-        {/* Aether Drive Sidebar Toggle Button */}
-        <button
-          onClick={() => toggleAetherDriveSidebar()}
-          className={`flex items-center space-x-1.5 px-2 py-1 rounded text-[11px] border transition-colors shrink-0 ${
-            store.aetherDriveSidebarOpen
-              ? 'bg-cyan-950/70 border-cyan-500/60 text-cyan-200 shadow-sm shadow-cyan-500/20'
-              : 'bg-slate-800/80 hover:bg-slate-800 text-slate-300 border-slate-700/60'
-          }`}
-          title="Aether Drive Workspace Sidebar (Cmd+\ / Ctrl+\)"
-          data-testid="btn-toggle-drive-sidebar"
-        >
-          <FolderTree className="w-3.5 h-3.5 text-cyan-400" />
-          <span className="hidden md:inline font-semibold">Drive</span>
-          <kbd className="hidden lg:inline text-[9px] bg-slate-900 text-slate-400 px-1 py-0.2 rounded border border-slate-800">
-            Ctrl+\
-          </kbd>
-        </button>
-
-        {/* Chrome-Style Tabs & '+' Button directly in Header */}
-        <ChromeHeaderTabs />
-
-        {/* Pending Pipeline Stage Banner */}
-        {store.pipelineActive && store.pipelineQueue.length > 0 && (
-          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-950/60 border border-amber-600/50 text-[10px] font-mono text-amber-200 shrink-0">
-            <span className="hidden lg:inline">
-              Next stage: @{store.pipelineQueue[0].targetCli}
-            </span>
-            <span className="px-1 rounded-full bg-amber-600 text-white text-[9px] font-bold">
-              {store.pipelineQueue.length}
-            </span>
-            <button
-              onClick={() => advancePipelineStage()}
-              className="px-1.5 py-0.5 rounded bg-amber-600 hover:bg-amber-500 text-white font-semibold transition-colors"
-              title="Advance Pipeline Stage (Alt+Shift+P)"
-            >
-              Advance
-            </button>
-            <button
-              onClick={() => clearPipeline()}
-              className="p-0.5 rounded text-amber-300 hover:text-white transition-colors"
-              title="Cancel remaining stages"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-        )}
-
-        {/* Global Action Toolbar */}
-        <div className="flex items-center space-x-1 sm:space-x-1.5 shrink-0">
-          {/* Command Palette Button */}
-          <button
-            onClick={() => toggleCommandPalette()}
-            className="flex items-center space-x-1.5 px-2 py-1 rounded text-[11px] bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700/60 transition-colors"
-            title="Command Palette (Ctrl+P / Cmd+P)"
-          >
-            <Search className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="hidden md:inline">Palette</span>
-            <kbd className="hidden lg:inline text-[9px] bg-slate-900 text-slate-400 px-1 py-0.2 rounded border border-slate-800">
-              Ctrl+P
-            </kbd>
-          </button>
-
-          {/* Theme & Appearance Button */}
-          <button
-            onClick={() => toggleThemeModal()}
-            className="flex items-center space-x-1.5 px-2 py-1 rounded text-[11px] bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700/60 transition-colors"
-            title="Theme & Appearance (Cmd+, / Ctrl+,)"
-          >
-            <Palette className="w-3.5 h-3.5 text-purple-400" />
-            <span className="hidden md:inline">Theme</span>
-            <kbd className="hidden lg:inline text-[9px] bg-slate-900 text-slate-400 px-1 py-0.2 rounded border border-slate-800">
-              Cmd+,
-            </kbd>
-          </button>
-
-          {/* Background Tasks Drawer Button */}
-          <button
-            onClick={() => toggleBackgroundDrawer()}
-            className={`flex items-center space-x-1.5 px-2 py-1 rounded text-[11px] border transition-colors ${
-              store.backgroundTasks.length > 0
-                ? 'bg-emerald-950/60 border-emerald-600/50 text-emerald-300 shadow-sm shadow-emerald-500/20'
-                : 'bg-slate-800/80 hover:bg-slate-800 text-slate-300 border-slate-700/60'
-            }`}
-            title="Background Terminals & Tasks (Alt+Shift+B)"
-          >
-            <Layers className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="hidden xl:inline">Background</span>
-            {store.backgroundTasks.length > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-emerald-600 text-white font-mono font-bold">
-                {store.backgroundTasks.length}
-              </span>
-            )}
-          </button>
-
-          {/* Equalize / Balance Panes Button */}
-          <button
-            onClick={() => equalizeLayout()}
-            className="p-1 rounded text-slate-400 hover:text-cyan-300 hover:bg-slate-800 transition-colors"
-            title="Equalize & Balance Split Panes (Alt+E)"
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5" />
-          </button>
-          {/* Spawn Agent Button & Dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setSpawnMenuOpen(!spawnMenuOpen)}
-              className="flex items-center space-x-1 px-2 py-1 rounded bg-indigo-600/90 hover:bg-indigo-600 text-white text-[11px] font-medium shadow-sm transition-all"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Spawn</span>
-              <ChevronDown className="w-3 h-3 text-indigo-200" />
-            </button>
-
-            {spawnMenuOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setSpawnMenuOpen(false)}
-                />
-                <div className="absolute right-0 mt-1 w-60 bg-slate-900 border border-slate-800 rounded-lg shadow-2xl py-1 z-50 text-xs divide-y divide-slate-800/80">
-                  {/* Interactive Shells Section */}
-                  <div className="py-1">
-                    <div className="px-3 py-1 text-[10px] uppercase font-bold tracking-wider text-cyan-400">
-                      Interactive Shells
-                    </div>
-                    {store.detectedTools.filter((t) => t.category === 'shell').length > 0
-                      ? store.detectedTools
-                          .filter((t) => t.category === 'shell')
-                          .map((tool) => {
-                            const isDefault = store.defaultShell === tool.id || store.defaultShell === tool.binary;
-                            return (
-                              <div
-                                key={tool.id}
-                                className="w-full px-3 py-1.5 flex items-center justify-between hover:bg-slate-800 transition-colors group cursor-pointer"
-                                onClick={() => {
-                                  spawnAgentPane(tool.id, false);
-                                  setSpawnMenuOpen(false);
-                                }}
-                              >
-                                <div className="flex items-center space-x-2">
-                                  <span
-                                    className="w-2 h-2 rounded-full shrink-0"
-                                    style={{ backgroundColor: tool.color }}
-                                  />
-                                  <span className="text-slate-200 group-hover:text-white font-mono text-[11px]">
-                                    {tool.name}
-                                  </span>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setDefaultShell(tool.id);
-                                  }}
-                                  className={`text-[9px] px-1 py-0.5 rounded font-mono transition-colors ${
-                                    isDefault
-                                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                                      : 'text-slate-500 hover:text-slate-300'
-                                  }`}
-                                  title={isDefault ? 'Current default startup shell' : 'Set as default startup shell'}
-                                >
-                                  {isDefault ? 'default' : 'set'}
-                                </button>
-                              </div>
-                            );
-                          })
-                      : Object.entries(AGENT_PALETTES)
-                          .filter(([_, info]) => info.category === 'shell')
-                          .map(([key, info]) => {
-                            const isDefault = store.defaultShell === key;
-                            return (
-                              <div
-                                key={key}
-                                className="w-full px-3 py-1.5 flex items-center justify-between hover:bg-slate-800 transition-colors group cursor-pointer"
-                                onClick={() => {
-                                  spawnAgentPane(key, false);
-                                  setSpawnMenuOpen(false);
-                                }}
-                              >
-                                <div className="flex items-center space-x-2">
-                                  <span
-                                    className="w-2 h-2 rounded-full shrink-0"
-                                    style={{ backgroundColor: info.color }}
-                                  />
-                                  <span className="text-slate-200 group-hover:text-white font-mono text-[11px]">
-                                    {info.name}
-                                  </span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                  </div>
-
-                  {/* AI Agent Environments Section */}
-                  <div className="py-1">
-                    <div className="px-3 py-1 text-[10px] uppercase font-bold tracking-wider text-indigo-400 flex items-center justify-between">
-                      <span>Detected Agents</span>
-                      <span className="text-[9px] text-emerald-400 font-normal">
-                        {store.detectedTools.filter((t) => t.category === 'agent').length} found
-                      </span>
-                    </div>
-                    {store.detectedTools.filter((t) => t.category === 'agent').length > 0 ? (
-                      store.detectedTools
-                        .filter((t) => t.category === 'agent')
-                        .map((tool) => (
-                          <button
-                            key={tool.id}
-                            onClick={() => {
-                              spawnAgentPane(tool.id, true);
-                              setSpawnMenuOpen(false);
-                            }}
-                            className="w-full text-left px-3 py-1.5 flex items-center space-x-2 hover:bg-slate-800 transition-colors"
-                            title={tool.description}
-                          >
-                            <span
-                              className="w-2 h-2 rounded-full shrink-0"
-                              style={{ backgroundColor: tool.color }}
-                            />
-                            <span className="text-slate-200 hover:text-white text-[11px] font-mono truncate">
-                              {tool.name}
-                            </span>
-                          </button>
-                        ))
-                    ) : (
-                      <div className="px-3 py-1.5 text-[10px] text-slate-500 italic">
-                        No agent CLIs detected
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Custom Tool Option */}
-                  <div className="py-1">
-                    <button
-                      onClick={() => {
-                        setSpawnMenuOpen(false);
-                        toggleCustomToolModal(true);
-                      }}
-                      className="w-full text-left px-3 py-1.5 flex items-center space-x-2 text-cyan-400 hover:bg-cyan-500/10 transition-colors"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span className="font-mono text-[11px] font-medium">Custom CLI Tool...</span>
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Quick Split Buttons */}
-          <div className="hidden md:flex items-center space-x-1 border-l border-slate-800 pl-1">
-            <button
-              onClick={() => splitActivePane('vertical')}
-              className="p-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
-              title="Split Vertical (Alt+V)"
-            >
-              <Columns className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => splitActivePane('horizontal')}
-              className="p-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
-              title="Split Horizontal (Alt+S)"
-            >
-              <Rows className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {/* Diff Gatekeeper Button */}
-          <button
-            onClick={() => openDiffGatekeeper()}
-            className="flex items-center space-x-1 px-2 py-1 rounded bg-slate-800/80 hover:bg-slate-800 text-slate-300 text-[11px] border border-slate-700/60 transition-colors"
-            title="Worktree Diff Gatekeeper (Alt+M)"
-          >
-            <GitBranch className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="hidden lg:inline">Diff</span>
-          </button>
-
-          {/* Time Travel Slider Button */}
-          <button
-            onClick={() => toggleTimeTravel()}
-            className="flex items-center space-x-1 px-2 py-1 rounded bg-slate-800/80 hover:bg-slate-800 text-slate-300 text-[11px] border border-slate-700/60 transition-colors"
-            title="Time Travel Zero-Commit Snapshots (Alt+Z)"
-          >
-            <History className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden lg:inline">Snapshots</span>
-          </button>
-
-          {/* Orchestrator Prompt Button */}
-          <button
-            onClick={() => toggleOrchestrator()}
-            className="flex items-center space-x-1 px-2 py-1 rounded bg-indigo-950/70 border border-indigo-700/50 hover:bg-indigo-900/80 text-indigo-200 text-[11px] transition-colors"
-            title="Multi-CLI Prompt Orchestrator (Ctrl+Space)"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-            <span className="hidden sm:inline">Broadcast</span>
-          </button>
-
-          {/* Collective Memory / Obsidian Sidebar Button */}
-          <button
-            onClick={() => toggleObsidianSidebar()}
-            className={`flex items-center space-x-1 px-2 py-1 rounded text-[11px] border transition-colors ${
-              store.obsidianSidebarOpen
-                ? 'bg-purple-900/60 border-purple-500 text-purple-200 shadow-sm shadow-purple-500/20'
-                : 'bg-slate-800/80 hover:bg-slate-800 text-slate-300 border-slate-700/60'
-            }`}
-            title="Collective Memory Blackboard & Obsidian Vault (Ctrl+B)"
-          >
-            <Brain className="w-3.5 h-3.5 text-purple-400" />
-            <span className="hidden sm:inline">Brain</span>
-            {store.blackboard.length > 0 && (
-              <span className="px-1 py-0.2 rounded-full text-[9px] bg-purple-700 text-white font-mono">
-                {store.blackboard.length}
-              </span>
-            )}
-          </button>
-        </div>
-      </header>
+      {/* ================= MAIN APPLICATION VIEWPORT ================= */}
+      <div className="flex flex-col flex-1 h-full min-w-0 overflow-hidden">
+        {/* ================= TOP APPLICATION BAR ================= */}
+        <TopBar />
 
       {/* ================= MAIN TERMINAL AREA ================= */}
-      <main className="flex-1 w-full relative overflow-hidden bg-slate-950 flex flex-row">
-        <AetherDriveSidebar />
+      <main className="flex-1 w-full relative overflow-hidden bg-cortex-bg flex flex-row">
         <div className="flex-1 h-full relative overflow-hidden min-w-0">
           <TerminalGrid registerTermWriter={registerTermWriter} />
         </div>
+        <AiAssistantPanel />
       </main>
 
+
       {/* ================= BOTTOM STATUS FOOTER ================= */}
-      <footer className="h-6 bg-slate-950 border-t border-slate-800/80 px-3 flex items-center justify-between text-[10px] text-slate-500 shrink-0 z-20">
+      <footer className="h-6 bg-cortex-bgAlt border-t border-cortex-border px-3 flex items-center justify-between text-[10px] text-cortex-textMuted shrink-0 z-20">
         {/* Left: Active Pane & Port Status */}
         <div className="flex items-center space-x-3 truncate">
           {activePane ? (
@@ -513,6 +164,7 @@ const App: React.FC = () => {
           </span>
         </div>
       </footer>
+      </div>
 
       {/* ================= MODALS & DRAWERS ================= */}
       <CommandPaletteModal />
@@ -525,6 +177,7 @@ const App: React.FC = () => {
       <ConfirmCloseModal />
       <BackgroundTasksDrawer />
       <WorkflowsModal />
+      <AiSettingsModal />
     </div>
   );
 };
@@ -549,7 +202,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
         <div className="w-screen h-screen bg-[#16161e] text-[#c0caf5] flex flex-col items-center justify-center p-8 select-none font-mono">
           <div className="max-w-md w-full bg-slate-900/90 border border-red-500/40 rounded-xl p-6 shadow-2xl space-y-4">
             <div className="flex items-center gap-3 text-red-400 font-bold text-sm">
-              <span>⚠️ AetherTerminal UI Recovered</span>
+              <span>AetherTerminal UI Recovered</span>
             </div>
             <p className="text-xs text-slate-300">
               {this.state.error?.message || 'An unexpected rendering error occurred.'}

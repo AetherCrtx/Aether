@@ -3,7 +3,7 @@ use aether_protocol::ipc::async_codec::{read_ipc_message, write_ipc_message};
 use aether_protocol::ipc::{
     ClaimModuleRequest, CreateSnapshotRequest, IpcEvent, IpcMessage, IpcRequest, IpcRequestPayload,
     IpcResponsePayload, MergeWorktreeRequest, ObsidianReadNoteRequest,
-    ObsidianUpdateTaskRequest, PaneSpawnedInfo, PaneSummary, PtyInputRequest, PublishBlackboardRequest,
+    ObsidianUpdateTaskRequest, PaneSpawnedInfo, PaneSummary, ProviderConfig, PtyInputRequest, PublishBlackboardRequest,
     ReleaseModuleRequest, ResizePaneRequest, RollbackSnapshotRequest, SharedContextSummary,
     SpawnPaneRequest, WorktreeDiffRequest, WorktreeDiffSummary,
 };
@@ -1266,6 +1266,115 @@ pub fn ensure_daemon_running() {
     }
 }
 
+#[tauri::command]
+pub async fn cmd_save_ai_provider_config(
+    provider: String,
+    api_key: String,
+    model: String,
+    base_url: Option<String>,
+    display_name: Option<String>,
+    protocol: Option<String>,
+    state: State<'_, GuiBridgeState>,
+) -> Result<ProviderConfig, String> {
+    let payload = IpcRequestPayload::SaveAiProviderConfig {
+        provider,
+        api_key,
+        model,
+        base_url,
+        display_name,
+        protocol,
+    };
+    match state.send_request(payload).await? {
+        IpcResponsePayload::AiProviderConfig(config) => Ok(config),
+        other => Err(format!("Unexpected response payload: {:?}", other)),
+    }
+}
+
+#[tauri::command]
+pub async fn cmd_delete_ai_provider_config(
+    provider: String,
+    state: State<'_, GuiBridgeState>,
+) -> Result<ProviderConfig, String> {
+    let payload = IpcRequestPayload::DeleteAiProviderConfig { provider };
+    match state.send_request(payload).await? {
+        IpcResponsePayload::AiProviderConfig(config) => Ok(config),
+        other => Err(format!("Unexpected response payload: {:?}", other)),
+    }
+}
+
+#[tauri::command]
+pub async fn cmd_get_ai_provider_config(
+    state: State<'_, GuiBridgeState>,
+) -> Result<ProviderConfig, String> {
+    let payload = IpcRequestPayload::GetAiProviderConfig;
+    match state.send_request(payload).await? {
+        IpcResponsePayload::AiProviderConfig(config) => Ok(config),
+        other => Err(format!("Unexpected response payload: {:?}", other)),
+    }
+}
+
+#[tauri::command]
+pub async fn cmd_run_ai_pilot_prompt(
+    pane_id: String,
+    instruction: String,
+    state: State<'_, GuiBridgeState>,
+) -> Result<String, String> {
+    let payload = IpcRequestPayload::RunAiPilotPrompt {
+        pane_id,
+        instruction,
+    };
+    match state.send_request(payload).await? {
+        IpcResponsePayload::AiPilotPromptResult { result } => Ok(result),
+        other => Err(format!("Unexpected response payload: {:?}", other)),
+    }
+}
+
+#[tauri::command]
+pub async fn cmd_test_ai_provider(
+    provider: String,
+    api_key: String,
+    model: String,
+    base_url: Option<String>,
+    state: State<'_, GuiBridgeState>,
+) -> Result<String, String> {
+    let payload = IpcRequestPayload::TestAiProviderConnection {
+        provider,
+        api_key,
+        model,
+        base_url,
+    };
+    match state.send_request(payload).await? {
+        IpcResponsePayload::AiProviderTestResult { success, message } => {
+            if success {
+                Ok(message)
+            } else {
+                Err(message)
+            }
+        }
+        other => Err(format!("Unexpected response payload: {:?}", other)),
+    }
+}
+
+#[tauri::command]
+pub async fn cmd_ai_chat(
+    provider: String,
+    model: Option<String>,
+    prompt: String,
+    system_prompt: Option<String>,
+    state: State<'_, GuiBridgeState>,
+) -> Result<String, String> {
+    let payload = IpcRequestPayload::AiChat {
+        provider,
+        model,
+        prompt,
+        system_prompt,
+    };
+    match state.send_request(payload).await? {
+        IpcResponsePayload::AiChatResult { content } => Ok(content),
+        other => Err(format!("Unexpected response payload: {:?}", other)),
+    }
+}
+
 pub fn resolve_socket_path() -> PathBuf {
     if let Ok(path) = std::env::var("AETHER_SOCK").or_else(|_| std::env::var(AETHER_SOCK_ENV)) {
         return PathBuf::from(path);
@@ -2008,7 +2117,7 @@ mod tests {
         let temp_dir = std::env::temp_dir().join(format!("aether_gui_test_search_uni_{}", Uuid::new_v4().simple()));
         std::fs::create_dir_all(&temp_dir).unwrap();
 
-        let content = "Line 1: Привет мир\nLine 2: 你好世界\nLine 3: 🚀 rocket launch\n";
+        let content = "Line 1: Привет мир\nLine 2: 你好世界\nLine 3: \u{1f680} rocket launch\n";
         std::fs::write(temp_dir.join("unicode.txt"), content).unwrap();
 
         let cyrillic = cmd_search_workspace_files(
@@ -2035,7 +2144,7 @@ mod tests {
 
         let emoji = cmd_search_workspace_files(
             Some(temp_dir.to_str().unwrap().to_string()),
-            "🚀".to_string(),
+            "\u{1f680}".to_string(),
             None,
         )
         .await
@@ -2290,7 +2399,7 @@ line 5: empty lines and spaces
 
         // 1. Line with multiple byte-shrinking and multi-byte characters before target
         // Kelvin sign \u{212a} (3 bytes), Angstrom \u{212b} (3 bytes), Sharp S \u{1e9e} (3 bytes), Rocket \u{1f680} (4 bytes)
-        let line1 = "🚀 prefix \u{212a} and \u{212b} and \u{1e9e} target_alpha suffix\n";
+        let line1 = "\u{1f680} prefix \u{212a} and \u{212b} and \u{1e9e} target_alpha suffix\n";
         // 2. Cyrillic and Greek
         let line2 = "Greek: ΣΙΣΥΦΟΣ and Cyrillic: ПРИВЕТ МИР and French: CAFÉ\n";
         // 3. Repeating targets with Unicode in between

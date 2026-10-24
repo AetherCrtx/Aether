@@ -1,29 +1,25 @@
-# DISPATCH — Reviewer (Milestone 2)
+## 2026-10-24T10:47:50Z
+You are Milestone 2 Code Reviewer 1.
+Your Working Directory: /home/rasshqa/projects/Elliot/.agents/teamwork_preview_reviewer_m2_1
+Authoritative Request: /home/rasshqa/projects/Elliot/.agents/ORIGINAL_REQUEST.md
+Project Root: /home/rasshqa/projects/Elliot
+Scope & Architecture: /home/rasshqa/projects/Elliot/PROJECT.md
+Worker Handoff: /home/rasshqa/projects/Elliot/.agents/teamwork_preview_worker_m2_cortex/handoff.md
 
-## Mission
-Review Milestone 2 changes in `ui/src/utils/commandClassifier.ts`, `ui/src/components/ModernInputBar.tsx`, and `ui/src/stores/aetherStore.ts`.
-Verify correctness, edge-case classification, TypeScript types, build validity, and agent routing.
-
-## Mandatory Inputs (Read first!)
-- Original User Request: `/home/rasshqa/projects/Elliot/.agents/ORIGINAL_REQUEST.md`
-- Project Architecture & Scope: `/home/rasshqa/projects/Elliot/PROJECT.md`
-- Worker M2 Handoff: `/home/rasshqa/projects/Elliot/.agents/teamwork_preview_worker_m2/handoff.md`
-- Your Working Directory: `/home/rasshqa/projects/Elliot/.agents/teamwork_preview_reviewer_m2_1`
-- Parent Conversation ID: `b4b0fa97-873a-4908-ab8b-7c3e9bde85fa`
-
-## Verification Requirements
-Run:
-```bash
-cd /home/rasshqa/projects/Elliot/ui
-node --test tests/commandClassifier.test.ts
-npx tsc --noEmit && npm run build
-```
-Verify 20/20 unit tests pass and build succeeds with exit code 0.
-Write your report to `/home/rasshqa/projects/Elliot/.agents/teamwork_preview_reviewer_m2_1/handoff.md`.
-End with `VERDICT: APPROVE` or `VERDICT: REQUEST_CHANGES`. Notify parent via `send_message`.
-
-## 2026-10-24T03:55:19Z
-Read /home/rasshqa/projects/Elliot/.agents/teamwork_preview_reviewer_m2_1/DISPATCH.md and /home/rasshqa/projects/Elliot/.agents/ORIGINAL_REQUEST.md.
-Review Milestone 2 changes in ui/src/utils/commandClassifier.ts, ui/src/components/ModernInputBar.tsx, and ui/src/stores/aetherStore.ts.
-Run node --test tests/commandClassifier.test.ts and npx tsc --noEmit && npm run build in ui/.
-Write review report with VERDICT: APPROVE or VERDICT: REQUEST_CHANGES to /home/rasshqa/projects/Elliot/.agents/teamwork_preview_reviewer_m2_1/handoff.md and send a message when done.
+Review Milestone 2 deliverables:
+1. Examine ui/src/stores/aetherStore.ts:
+   - Full provider matrix: OpenAI (gpt-4o), Anthropic (claude-3-5-sonnet-20241022), Gemini (gemini-1.5-pro), Groq (llama-3.3-70b-versatile), Custom Provider, OpenRouter, Ollama.
+   - selectedAiProvider and selectedAiModel as single source of truth with localStorage persistence and reactive setters.
+   - Custom provider CRUD (addCustomProvider, updateCustomProvider, deleteCustomProvider) and validation logic.
+   - Connection testing (testProviderConnection) with feedback.
+2. Examine ui/src/components/AiSettingsModal.tsx:
+   - Provider list navigation and Custom Provider form.
+   - Key masking and toggle visibility.
+   - Neo-brutalist styling: sharp borders, flat surfaces, cosmic cyan accents, zero glassmorphism, zero emojis.
+   - Strict copy restriction: ZERO occurrences of 'BYOK'.
+3. Verify test coverage: ui/tests/aiProvidersM2.test.ts.
+4. Run verification commands:
+   - npm run build in ui/
+   - node --test tests/*.test.ts in ui/
+   - cargo check --workspace and cargo test --workspace
+5. Write your report to /home/rasshqa/projects/Elliot/.agents/teamwork_preview_reviewer_m2_1/handoff.md with explicit verdict: APPROVE or REQUEST_CHANGES. Send message to orchestrator.

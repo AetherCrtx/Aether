@@ -10,6 +10,7 @@ import {
   BlackboardEntry,
   AGENT_PALETTES,
 } from '../stores/aetherStore';
+import { Lock } from 'lucide-react';
 
 export const ObsidianSidebar: React.FC = () => {
   const state = useAetherStore();
@@ -200,7 +201,7 @@ export const ObsidianSidebar: React.FC = () => {
             className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
             title="Close Drawer"
           >
-            ✕
+            &times;
           </button>
         </div>
       </div>
@@ -239,7 +240,8 @@ export const ObsidianSidebar: React.FC = () => {
               <div className="rounded-md border border-amber-500/40 bg-amber-950/20 p-2.5">
                 <div className="flex items-center justify-between text-amber-300 font-mono font-medium mb-1.5">
                   <span className="flex items-center gap-1.5">
-                    <span>🔒</span> Active Module Claims ({state.fileLocks.length})
+                    <Lock className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Active Module Claims ({state.fileLocks.length})</span>
                   </span>
                 </div>
                 <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">

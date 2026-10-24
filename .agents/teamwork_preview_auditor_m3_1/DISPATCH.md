@@ -29,3 +29,22 @@ Perform forensic integrity audit on Milestone 3 deliverables.
 Verify genuine implementation, non-facade logic, full build and test execution.
 Write audit report with VERDICT: CLEAN or VERDICT: INTEGRITY VIOLATION to /home/rasshqa/projects/Elliot/.agents/teamwork_preview_auditor_m3_1/handoff.md and send a message when done.
 
+## 2026-10-24T11:18:05Z
+You are Milestone 3 Forensic Auditor.
+Your Working Directory: /home/rasshqa/projects/Elliot/.agents/teamwork_preview_auditor_m3_1
+Authoritative Request: /home/rasshqa/projects/Elliot/.agents/ORIGINAL_REQUEST.md
+Project Root: /home/rasshqa/projects/Elliot
+Worker Handoff: /home/rasshqa/projects/Elliot/.agents/teamwork_preview_worker_m3_cortex/handoff.md
+
+Perform rigorous integrity forensics on Milestone 3:
+1. Verify genuine implementation: Ensure TopBar.tsx and InputBar.tsx genuinely manage tabs, PTY engine integration, auto-height textarea, shell protection routing, and provider synchronization, with zero dummy facades or placeholder stubs.
+2. Test integrity audit: Audit ui/tests/terminalInputBarM3.test.ts to ensure assertions test real DOM properties, mode switching, classifier guards, and store mutations, with zero hardcoded passes or error suppressions.
+3. Strict constraints check: 0 occurrences of 'BYOK' in user-facing UI, 0 user-facing occurrences of 'Modern Input Bar', 0 emoji characters in code or comments.
+4. Execute verification commands:
+   - npm run build in ui/
+   - node --test tests/*.test.ts in ui/
+   - cargo check --workspace and cargo test --workspace
+5. Write your audit report to /home/rasshqa/projects/Elliot/.agents/teamwork_preview_auditor_m3_1/handoff.md with explicit binary verdict: CLEAN or INTEGRITY VIOLATION.
+6. Send message to orchestrator.
+
+

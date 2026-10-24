@@ -10,7 +10,7 @@ import { Palette, X, Check, Sliders, Sparkles, Monitor, SunMedium, Moon, Cpu } f
 
 export const ThemeModal: React.FC = () => {
   const store = useAetherStore();
-  const [selectedThemeId, setSelectedThemeId] = useState(store.currentTheme || 'tokyo-night');
+  const [selectedThemeId, setSelectedThemeId] = useState(store.currentTheme || 'aethercortex-dark');
   const [opacity, setOpacity] = useState(store.windowOpacity || 0.95);
   const [terminalRenderer, setTerminalRenderer] = useState(
     () => (typeof window !== 'undefined' ? localStorage.getItem('aether_terminal_renderer') || 'auto' : 'auto')
@@ -230,7 +230,7 @@ export const ThemeModal: React.FC = () => {
                 <span style={{ color: currentTheme.xterm.green }}>git:(main)</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span style={{ color: currentTheme.accent }}>❯</span>
+                <span style={{ color: currentTheme.accent }}>&gt;</span>
                 <span>cargo test --workspace</span>
               </div>
               <div style={{ color: currentTheme.xterm.green }} className="text-[11px]">
