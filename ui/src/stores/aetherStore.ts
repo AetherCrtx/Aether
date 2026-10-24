@@ -1936,77 +1936,55 @@ export function subscribeAetherEvents(onPtyData?: (paneId: string, bytes: Uint8A
   };
 }
 
-export async function restoreActivePanes(): Promise<void> {
-  if (!invoke) return;
+export async function cleanupAllPanes(): Promise<void> {
+  if (isRunningInTauri() && invoke) {
+    try {
+      await invoke('cmd_cleanup_all_panes');
+    } catch (e) {
+      console.warn('cmd_cleanup_all_panes failed, falling back to manual kill:', e);
+      for (const p of globalState.panes) {
+        try {
+          await invoke('cmd_kill_pane', { paneId: p.id, signal: 9 });
+        } catch {}
+      }
+    }
+  }
+  globalState.panes = [];
+  globalState.tabs = [];
+  globalState.activePaneId = null;
+  globalState.activeTabId = null;
+  globalState.layout = null;
+  globalState.commandBlocks = [];
+  notify();
+}
+
+export async function initFreshSession(): Promise<void> {
+  // 1. Terminate any lingering background child processes / panes from daemon
+  await cleanupAllPanes();
+
+  // 2. Discover available CLI tools and shells
   try {
     await detectAvailableTools();
-    const list: any = await invoke('cmd_list_panes', {
-      workspaceId: globalState.workspaceId,
-    });
-    if (Array.isArray(list) && list.length > 0) {
-      const restoredPanes: AgentPane[] = list.map((item: any) => {
-        const detected = globalState.detectedTools.find(
-          (t) => t.id === item.cli_type || t.binary === item.cli_type
-        );
-        const palette = detected
-          ? { name: detected.name, color: detected.color, binary: detected.binary }
-          : AGENT_PALETTES[item.cli_type] || {
-              name: item.cli_type,
-              color: '#7aa2f7',
-              binary: item.cli_type,
-            };
-        return {
-          id: item.pane_id,
-          cliType: item.cli_type,
-          pid: item.pid || 0,
-          status: item.status || 'IDLE',
-          worktreePath: item.worktree_path || null,
-          gitBranch: item.git_branch || null,
-          openPorts: item.open_ports || [],
-          color: palette.color,
-        };
-      });
-
-      globalState.panes = restoredPanes;
-      if (!globalState.activePaneId || !restoredPanes.some((p) => p.id === globalState.activePaneId)) {
-        globalState.activePaneId = restoredPanes[0].id;
-      }
-
-      // Reconstruct layout tree & balanced ratios
-      let layout: LayoutNode | null = null;
-      for (const p of restoredPanes) {
-        if (!layout) {
-          layout = { type: 'pane', paneId: p.id };
-        } else {
-          layout = {
-            type: 'split',
-            id: createSplitId(),
-            direction: 'vertical',
-            splitRatio: 0.5,
-            children: [layout, { type: 'pane', paneId: p.id }],
-          };
-        }
-      }
-      globalState.layout = balanceLayout(layout);
-
-      const defaultTab: TerminalTab = {
-        id: 'tab_default',
-        title: restoredPanes.length > 1 ? `Workspace (${restoredPanes.length})` : `@${restoredPanes[0].cliType}`,
-        paneIds: restoredPanes.map((p) => p.id),
-        layout: globalState.layout,
-        activePaneId: globalState.activePaneId,
-      };
-      globalState.tabs = [defaultTab];
-      globalState.activeTabId = defaultTab.id;
-
-      notify();
-    } else {
-      // If no active panes exist, create initial tab with default shell!
-      await createTab('Main', globalState.defaultShell || 'shell');
-    }
   } catch (e) {
-    console.warn('Failed to restore active panes from daemon:', e);
+    console.warn('Failed to detect tools on init:', e);
   }
+
+  // 3. Open a clean, fresh shell tab with pristine terminal state
+  await createTab('Main', globalState.defaultShell || 'shell');
+
+  // 4. Automatically open a brand new clean AI assistant session
+  try {
+    createAiSession('Percakapan Baru');
+  } catch (e) {
+    console.warn('Failed to create fresh AI session on init:', e);
+  }
+
+  notify();
+}
+
+export async function restoreActivePanes(): Promise<void> {
+  // Always initialize a clean session on launch to prevent background processing leaks
+  await initFreshSession();
 }
 
 export async function refreshSharedContext(query?: string) {

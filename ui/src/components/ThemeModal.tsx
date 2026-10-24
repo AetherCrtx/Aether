@@ -16,16 +16,21 @@ export const ThemeModal: React.FC = () => {
     () => (typeof window !== 'undefined' ? localStorage.getItem('aether_terminal_renderer') || 'auto' : 'auto')
   );
 
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'light' | 'dark'>('all');
+
+  useEffect(() => {
+    if (store.themeModalOpen) {
+      setSelectedThemeId(store.currentTheme || 'aethercortex-dark');
+      setOpacity(store.windowOpacity || 0.95);
+    }
+  }, [store.themeModalOpen, store.currentTheme, store.windowOpacity]);
+
   const handleRendererChange = (val: string) => {
     setTerminalRenderer(val);
     if (typeof window !== 'undefined') {
       localStorage.setItem('aether_terminal_renderer', val);
     }
   };
-
-  if (!store.themeModalOpen) return null;
-
-  const currentTheme = AETHER_THEMES.find((t) => t.id === selectedThemeId) || AETHER_THEMES[0];
 
   const handleSelectTheme = (theme: AetherTheme) => {
     setSelectedThemeId(theme.id);
@@ -37,7 +42,9 @@ export const ThemeModal: React.FC = () => {
     setTerminalOpacity(val);
   };
 
-  const [categoryFilter, setCategoryFilter] = useState<'all' | 'light' | 'dark'>('all');
+  if (!store.themeModalOpen) return null;
+
+  const currentTheme = AETHER_THEMES.find((t) => t.id === selectedThemeId) || AETHER_THEMES[0];
 
   const filteredThemes = AETHER_THEMES.filter((t) => {
     const isLight =

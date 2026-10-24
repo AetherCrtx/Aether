@@ -102,7 +102,7 @@ describe('Milestone 1: Brand Identity, Design Tokens & Persistent Sidebar Unit T
       assert.equal(darkTheme.bg, '#0B1013');
       assert.equal(darkTheme.panel, '#0E1418');
       assert.equal(darkTheme.border, '#162026');
-      assert.equal(darkTheme.fg, '#93C5FD');
+      assert.equal(darkTheme.fg, '#F8FAFC');
 
       // Verify Light Mode palette tokens with high-contrast cyan
       assert.equal(lightTheme.accent, '#00A3AD');

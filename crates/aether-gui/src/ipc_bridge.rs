@@ -390,6 +390,20 @@ pub async fn cmd_kill_pane(
 }
 
 #[tauri::command]
+pub async fn cmd_cleanup_all_panes(state: State<'_, GuiBridgeState>) -> Result<(), String> {
+    let req = IpcRequestPayload::ListPanes { workspace_id: None };
+    if let Ok(IpcResponsePayload::PaneList(panes)) = state.send_request(req).await {
+        for p in panes {
+            let _ = state.send_request(IpcRequestPayload::KillPane(aether_protocol::ipc::KillPaneRequest {
+                pane_id: p.pane_id,
+                signal: Some(9),
+            })).await;
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
 pub fn cmd_check_pane_process(pid: u32, cli_type: String) -> Option<String> {
     if pid == 0 {
         return None;

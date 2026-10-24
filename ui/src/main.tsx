@@ -9,6 +9,8 @@ import {
   subscribeAetherEvents,
   refreshSharedContext,
   restoreActivePanes,
+  initFreshSession,
+  cleanupAllPanes,
 } from './stores/aetherStore';
 
 import { TerminalGrid } from './components/TerminalGrid';
@@ -77,15 +79,22 @@ const App: React.FC = () => {
       }
     });
 
-    // 3. Restore any existing active panes from daemon on launch
-    restoreActivePanes();
+    // 3. Initialize fresh terminal session & fresh AI session on launch
+    void initFreshSession();
 
     // 4. Initial load of blackboard entries and file claims
     refreshSharedContext();
 
+    const handleBeforeUnload = () => {
+      void cleanupAllPanes();
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
     return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
       cleanupShortcuts();
       cleanupEvents();
+      void cleanupAllPanes();
     };
   }, []);
 

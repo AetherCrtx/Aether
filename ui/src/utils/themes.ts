@@ -38,18 +38,18 @@ export const AETHER_THEMES: AetherTheme[] = [
   {
     id: 'aethercortex-dark',
     name: 'AetherCortex Dark',
-    description: 'Flagship Neo-Brutalist Dark theme with Blue Typography and Cosmic Cyan accents',
+    description: 'Flagship Neo-Brutalist Dark theme with Porcelain White Typography and Cosmic Cyan accents',
     accent: '#00F0FF',
     bg: '#0B1013',
     bgDark: '#050809',
     panel: '#0E1418',
     border: '#162026',
-    fg: '#93C5FD',
+    fg: '#F8FAFC',
     cursor: '#00F0FF',
     selection: '#00F0FF33',
     xterm: {
       background: '#050809',
-      foreground: '#93C5FD',
+      foreground: '#F8FAFC',
       cursor: '#00F0FF',
       selectionBackground: '#00F0FF33',
       black: '#050809',
@@ -59,7 +59,7 @@ export const AETHER_THEMES: AetherTheme[] = [
       blue: '#38BDF8',
       magenta: '#C084FC',
       cyan: '#00F0FF',
-      white: '#93C5FD',
+      white: '#F8FAFC',
       brightBlack: '#1F2E36',
       brightRed: '#FF5E7A',
       brightGreen: '#2BEAB3',
@@ -67,7 +67,7 @@ export const AETHER_THEMES: AetherTheme[] = [
       brightBlue: '#60A5FA',
       brightMagenta: '#D8B4FE',
       brightCyan: '#66F6FF',
-      brightWhite: '#DBEAFE',
+      brightWhite: '#FFFFFF',
     },
   },
   {
@@ -410,8 +410,10 @@ export function applyTheme(themeId: string, opacity: number = 0.95): AetherTheme
   root.style.setProperty('--cortex-surface-2', isLight ? '#E5E9EC' : '#121A1F');
   root.style.setProperty('--cortex-border', theme.border);
   root.style.setProperty('--cortex-text', theme.fg);
-  root.style.setProperty('--cortex-text-muted', isLight ? '#3B5B82' : '#7096BD');
-  root.style.setProperty('--cortex-text-bright', isLight ? '#1D4ED8' : '#BFDBFE');
+  root.style.setProperty('--cortex-text-muted', isLight ? '#3B5B82' : '#94A3B8');
+  root.style.setProperty('--cortex-text-bright', isLight ? '#1D4ED8' : '#FFFFFF');
+  root.style.setProperty('--color-fg', theme.fg);
+  root.style.setProperty('--color-fg-muted', isLight ? '#3B5B82' : '#94A3B8');
   root.style.setProperty('--cortex-accent', theme.accent);
 
   if (isLight) {

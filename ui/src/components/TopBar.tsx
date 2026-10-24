@@ -18,6 +18,7 @@ import {
   toggleCustomToolModal,
   toggleSidebarMinimized,
   isRunningInTauri,
+  cleanupAllPanes,
   AGENT_PALETTES,
 } from '../stores/aetherStore';
 import { ChromeHeaderTabs } from './ChromeHeaderTabs';
@@ -86,6 +87,11 @@ export const TopBar: React.FC<TopBarProps> = ({
   };
 
   const handleClose = async () => {
+    try {
+      await cleanupAllPanes();
+    } catch (e) {
+      console.warn('cleanupAllPanes failed on close:', e);
+    }
     if (isRunningInTauri()) {
       try {
         const { getCurrentWindow } = await import('@tauri-apps/api/window');
