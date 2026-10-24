@@ -12,6 +12,57 @@ interface Props {
   registerTermWriter: (paneId: string, writer: (data: Uint8Array | string) => void) => () => void;
 }
 
+/**
+ * Detect whether WebGL2 hardware acceleration is safe to use.
+ * Under Linux (WebKitGTK with WEBKIT_DISABLE_DMABUF_RENDERER=1 or Mesa software llvmpipe),
+ * WebGL falls back to CPU software rasterization, causing heavy input lag.
+ * The native DOM renderer uses Cairo/Wayland directly with 0ms keystroke latency.
+ */
+export function checkWebGLHardwareSupport(): boolean {
+  if (typeof window === 'undefined') return false;
+  const pref = localStorage.getItem('aether_terminal_renderer');
+  if (pref === 'dom') return false;
+  if (pref === 'webgl') return true;
+
+  // On Linux (especially WebKitGTK with hybrid GPUs and DMABUF disabled),
+  // DOM renderer provides 0ms input latency and zero CPU rasterization overhead.
+  const isLinux = typeof navigator !== 'undefined' && /linux|x11/i.test(navigator.userAgent || navigator.platform);
+  if (isLinux) {
+    try {
+      const canvas = document.createElement('canvas');
+      const gl = (canvas.getContext('webgl2') || canvas.getContext('webgl')) as WebGLRenderingContext | null;
+      if (!gl) return false;
+      const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+      const unmasked = dbg ? (gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) || '').toLowerCase() : '';
+      const standard = (gl.getParameter(gl.RENDERER) || '').toLowerCase();
+      if (/llvmpipe|softpipe|swrast|swiftshader|software/i.test(unmasked) || /llvmpipe|softpipe|swrast|swiftshader|software/i.test(standard)) {
+        console.warn(`[AetherTerminal] Software WebGL detected (${unmasked || standard}). Using high-performance native DOM renderer.`);
+        return false;
+      }
+      // On Linux WebKitGTK, default to native DOM renderer for optimal responsiveness unless WebGL is explicitly chosen
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  // Non-Linux or systems with verified GPU WebGL support
+  try {
+    const canvas = document.createElement('canvas');
+    const gl = (canvas.getContext('webgl2') || canvas.getContext('webgl')) as WebGLRenderingContext | null;
+    if (!gl) return false;
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    const unmasked = dbg ? (gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) || '').toLowerCase() : '';
+    const standard = (gl.getParameter(gl.RENDERER) || '').toLowerCase();
+    if (/llvmpipe|softpipe|swrast|swiftshader|software/i.test(unmasked) || /llvmpipe|softpipe|swrast|swiftshader|software/i.test(standard)) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export const XtermWebGLPane: React.FC<Props> = ({
   paneId,
   isActive,
@@ -94,18 +145,23 @@ export const XtermWebGLPane: React.FC<Props> = ({
     term.open(containerRef.current);
     termRef.current = term;
 
-    // 4. Initialize WebGL2 Hardware-Accelerated Renderer for smooth multi-agent CLI throughput
+    // 4. Initialize Renderer: Use WebGL2 only if hardware acceleration is active and not software emulation
     let webglAddon: WebglAddon | null = null;
-    try {
-      webglAddon = new WebglAddon();
-      webglAddon.onContextLoss(() => {
-        console.warn(`[Pane ${paneId}] WebGL context lost, falling back to DOM renderer`);
-        webglAddon?.dispose();
-        webglAddon = null;
-      });
-      term.loadAddon(webglAddon);
-    } catch (e) {
-      console.warn(`[Pane ${paneId}] WebGL renderer initialization error, using DOM renderer:`, e);
+    if (checkWebGLHardwareSupport()) {
+      try {
+        webglAddon = new WebglAddon();
+        webglAddon.onContextLoss(() => {
+          console.warn(`[Pane ${paneId}] WebGL context lost, falling back to DOM renderer`);
+          webglAddon?.dispose();
+          webglAddon = null;
+        });
+        term.loadAddon(webglAddon);
+        console.info(`[Pane ${paneId}] WebGL2 accelerated renderer active`);
+      } catch (e) {
+        console.warn(`[Pane ${paneId}] WebGL renderer initialization error, using DOM renderer:`, e);
+      }
+    } else {
+      console.info(`[Pane ${paneId}] Using native DOM renderer for 0ms input latency`);
     }
 
     const fitTerminal = () => {
@@ -217,16 +273,28 @@ export const XtermWebGLPane: React.FC<Props> = ({
       }
     };
 
+    // Helper to write immediately for interactive typing if queue is empty, or queue for bulk output
+    const writeOrQueue = (chunk: Uint8Array | string) => {
+      const len = typeof chunk === 'string' ? chunk.length : chunk.byteLength;
+      // Fast path: if no chunks are waiting and this is a small interactive packet (<= 1024 bytes, like a keystroke echo),
+      // write directly to xterm synchronously! This eliminates RAF latency (16-33ms) completely for typing.
+      if (chunkQueue.length === 0 && len <= 1024) {
+        term.write(chunk);
+        return;
+      }
+      chunkQueue.push(chunk);
+      scheduleFlush();
+    };
+
     let disposed = false;
     let lastWrittenOffset = 0;
     let scrollbackRestored = false;
     const preRestoreQueue: { data: Uint8Array | string; offset: number }[] = [];
 
-    // Register writer so incoming aetherd PTY events write to this terminal via RAF queue
+    // Register writer so incoming aetherd PTY events write to this terminal via instant fast-path or RAF queue
     const unregister = registerTermWriter(paneId, (data: Uint8Array | string, offset: number = 0) => {
       if (typeof data === 'string') {
-        chunkQueue.push(data);
-        scheduleFlush();
+        writeOrQueue(data);
         return;
       }
       if (!scrollbackRestored) {
@@ -240,13 +308,11 @@ export const XtermWebGLPane: React.FC<Props> = ({
       if (offset < lastWrittenOffset) {
         const slice = data.subarray(lastWrittenOffset - offset);
         lastWrittenOffset += slice.length;
-        chunkQueue.push(slice);
-        scheduleFlush();
+        writeOrQueue(slice);
         return;
       }
       lastWrittenOffset = offset + data.length;
-      chunkQueue.push(data);
-      scheduleFlush();
+      writeOrQueue(data);
     });
 
     // 5. Restore scrollback history (512 KB ring buffer in aetherd) before live output

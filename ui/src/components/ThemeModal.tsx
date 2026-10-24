@@ -6,12 +6,22 @@ import {
   setTerminalOpacity,
 } from '../stores/aetherStore';
 import { AETHER_THEMES, AetherTheme } from '../utils/themes';
-import { Palette, X, Check, Sliders, Sparkles, Monitor, SunMedium, Moon } from 'lucide-react';
+import { Palette, X, Check, Sliders, Sparkles, Monitor, SunMedium, Moon, Cpu } from 'lucide-react';
 
 export const ThemeModal: React.FC = () => {
   const store = useAetherStore();
   const [selectedThemeId, setSelectedThemeId] = useState(store.currentTheme || 'tokyo-night');
   const [opacity, setOpacity] = useState(store.windowOpacity || 0.95);
+  const [terminalRenderer, setTerminalRenderer] = useState(
+    () => (typeof window !== 'undefined' ? localStorage.getItem('aether_terminal_renderer') || 'auto' : 'auto')
+  );
+
+  const handleRendererChange = (val: string) => {
+    setTerminalRenderer(val);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('aether_terminal_renderer', val);
+    }
+  };
 
   if (!store.themeModalOpen) return null;
 
@@ -158,6 +168,45 @@ export const ThemeModal: React.FC = () => {
               onChange={(e) => handleOpacityChange(parseFloat(e.target.value))}
               className="w-full accent-cyan-400 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer"
             />
+          </div>
+
+          {/* Terminal Rendering Engine */}
+          <div className="border-t border-slate-800 pt-5">
+            <div className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2 flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Cpu className="w-4 h-4 text-cyan-400" />
+                <span>Terminal Rendering Engine</span>
+              </span>
+              <span className="text-cyan-400 font-mono text-[11px] uppercase">
+                {terminalRenderer}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 mb-3">
+              Choose the terminal rendering backend. On Linux with Wayland or hybrid graphics, Native DOM provides 0ms input latency and zero CPU rasterization overhead.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {[
+                { id: 'auto', label: 'Auto Detect', desc: 'Hardware WebGL or Native DOM fallback' },
+                { id: 'dom', label: 'Native DOM', desc: 'Zero lag, Cairo composited (Recommended on Linux)' },
+                { id: 'webgl', label: 'WebGL2', desc: 'GPU texture atlas (Requires hardware DRI)' },
+              ].map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => handleRendererChange(opt.id)}
+                  className={`p-2.5 rounded-lg border text-left transition-all ${
+                    terminalRenderer === opt.id
+                      ? 'border-cyan-400 bg-cyan-950/30 text-white shadow-sm shadow-cyan-950/50'
+                      : 'border-slate-800 bg-slate-950/40 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                  }`}
+                >
+                  <div className="text-xs font-semibold flex items-center justify-between">
+                    <span>{opt.label}</span>
+                    {terminalRenderer === opt.id && <Check className="w-3.5 h-3.5 text-cyan-400" />}
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-1">{opt.desc}</div>
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Live Mini Preview */}

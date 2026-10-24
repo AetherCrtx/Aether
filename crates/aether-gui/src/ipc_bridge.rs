@@ -160,14 +160,14 @@ pub fn start_event_listener(app_handle: AppHandle) {
                         }
                     });
 
-                    // 16ms interval (~60 FPS) and 32KB batch threshold
+                    // 8ms interval (~120 FPS) and 32KB batch threshold
                     process_event_stream(
                         event_rx,
                         |event_name, event| {
                             let _ = app_handle.emit(event_name, &event);
                         },
                         32 * 1024,
-                        16,
+                        8,
                     )
                     .await;
 
