@@ -18,6 +18,7 @@ import {
   toggleObsidianSidebar,
   toggleBackgroundDrawer,
   toggleCommandPalette,
+  toggleThemeModal,
   AGENT_PALETTES,
   setDefaultShell,
   toggleCustomToolModal,
@@ -36,6 +37,7 @@ import { ConfirmCloseModal } from './components/ConfirmCloseModal';
 import { BackgroundTasksDrawer } from './components/BackgroundTasksDrawer';
 import { WorkflowsModal } from './components/WorkflowsModal';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
+import { ThemeModal } from './components/ThemeModal';
 
 import {
   Terminal,
@@ -52,6 +54,7 @@ import {
   SlidersHorizontal,
   X,
   Search,
+  Palette,
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -169,6 +172,19 @@ const App: React.FC = () => {
             <span className="hidden md:inline">Palette</span>
             <kbd className="hidden lg:inline text-[9px] bg-slate-900 text-slate-400 px-1 py-0.2 rounded border border-slate-800">
               Ctrl+P
+            </kbd>
+          </button>
+
+          {/* Theme & Appearance Button */}
+          <button
+            onClick={() => toggleThemeModal()}
+            className="flex items-center space-x-1.5 px-2 py-1 rounded text-[11px] bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700/60 transition-colors"
+            title="Theme & Appearance (Cmd+, / Ctrl+,)"
+          >
+            <Palette className="w-3.5 h-3.5 text-purple-400" />
+            <span className="hidden md:inline">Theme</span>
+            <kbd className="hidden lg:inline text-[9px] bg-slate-900 text-slate-400 px-1 py-0.2 rounded border border-slate-800">
+              Cmd+,
             </kbd>
           </button>
 
@@ -476,6 +492,7 @@ const App: React.FC = () => {
 
       {/* ================= MODALS & DRAWERS ================= */}
       <CommandPaletteModal />
+      <ThemeModal />
       <OrchestratorBar />
       <DiffGatekeeperModal />
       <TimeTravelSlider />

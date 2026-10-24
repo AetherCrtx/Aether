@@ -20,6 +20,7 @@ import {
   spawnAgentPane,
   sendPtyInput,
   createSnapshot,
+  toggleThemeModal,
 } from '../stores/aetherStore';
 import {
   Search,
@@ -42,6 +43,7 @@ import {
   FolderPlus,
   Play,
   RotateCcw,
+  Palette,
 } from 'lucide-react';
 
 interface PaletteCommand {
@@ -305,6 +307,15 @@ export const CommandPaletteModal: React.FC = () => {
             sendPtyInput(store.activePaneId, '\x0c');
           }
         },
+      },
+      {
+        id: 'theming-appearance',
+        title: 'Theme & Appearance Settings',
+        description: 'Choose terminal theme preset and configure window opacity',
+        category: 'Terminal',
+        shortcut: 'Cmd+,',
+        icon: <Palette className="w-4 h-4 text-purple-400" />,
+        action: () => toggleThemeModal(true),
       },
     ];
 

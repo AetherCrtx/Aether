@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { invoke as tauriInvoke, isTauri as tauriIsTauri } from '@tauri-apps/api/core';
 import { listen as tauriListen } from '@tauri-apps/api/event';
+import { applyTheme } from '../utils/themes';
 
 export const isRunningInTauri = (): boolean => {
   try {
@@ -88,6 +89,7 @@ export interface TerminalTab {
   paneIds: string[];
   layout: LayoutNode | null;
   activePaneId: string | null;
+  color?: string;
 }
 
 export interface BackgroundTask {
@@ -206,8 +208,20 @@ let globalState = {
   workflows: [] as AetherWorkflow[],
   workflowsModalOpen: false,
   commandPaletteOpen: false,
+  themeModalOpen: false,
+  currentTheme: typeof localStorage !== 'undefined' ? (localStorage.getItem('aether_theme') || 'tokyo-night') : 'tokyo-night',
+  windowOpacity: typeof localStorage !== 'undefined' ? (parseFloat(localStorage.getItem('aether_opacity') || '0.95') || 0.95) : 0.95,
   obsidianRefreshTick: 0,
 };
+
+// Initialize theme on app load
+if (typeof window !== 'undefined') {
+  try {
+    applyTheme(globalState.currentTheme, globalState.windowOpacity);
+  } catch (e) {
+    console.warn('Failed to apply initial theme:', e);
+  }
+}
 
 export async function detectAvailableTools(): Promise<DetectedTool[]> {
   if (invoke) {
@@ -528,6 +542,34 @@ export function renameTab(tabId: string, newTitle: string) {
   const tab = globalState.tabs.find((t) => t.id === tabId);
   if (tab && newTitle.trim()) {
     tab.title = newTitle.trim();
+    notify();
+  }
+}
+
+export function setTabColor(tabId: string, color?: string | null) {
+  const tab = globalState.tabs.find((t) => t.id === tabId);
+  if (tab) {
+    tab.color = color || undefined;
+    notify();
+  }
+}
+
+export async function closeOtherTabs(tabId: string) {
+  const otherTabs = globalState.tabs.filter((t) => t.id !== tabId);
+  for (const other of otherTabs) {
+    await closeTab(other.id);
+  }
+  switchTab(tabId);
+}
+
+export async function duplicateTab(tabId: string) {
+  const tab = globalState.tabs.find((t) => t.id === tabId);
+  if (!tab) return;
+  const activePane = globalState.panes.find((p) => p.id === tab.activePaneId);
+  const cli = activePane?.cliType || 'shell';
+  const newTab = await createTab(`${tab.title} (copy)`, cli);
+  if (newTab && tab.color) {
+    newTab.color = tab.color;
     notify();
   }
 }
@@ -1041,6 +1083,23 @@ export function toggleCommandPalette(open?: boolean) {
   notify();
 }
 
+export function toggleThemeModal(open?: boolean) {
+  globalState.themeModalOpen = open !== undefined ? open : !globalState.themeModalOpen;
+  notify();
+}
+
+export function setAetherTheme(themeId: string) {
+  globalState.currentTheme = themeId;
+  applyTheme(themeId, globalState.windowOpacity);
+  notify();
+}
+
+export function setTerminalOpacity(opacity: number) {
+  globalState.windowOpacity = opacity;
+  applyTheme(globalState.currentTheme, opacity);
+  notify();
+}
+
 export function toggleCustomToolModal(open?: boolean) {
   globalState.customToolModalOpen = open !== undefined ? open : !globalState.customToolModalOpen;
   notify();
@@ -1191,11 +1250,20 @@ export function setupGlobalShortcuts() {
       e.preventDefault();
       splitActivePane(e.shiftKey ? 'horizontal' : 'vertical');
     }
+    // Ctrl+, or Cmd+, -> Theming / Appearance Modal
+    if ((e.ctrlKey || e.metaKey) && e.key === ',') {
+      e.preventDefault();
+      toggleThemeModal();
+    }
     // Escape -> Close open modals
     if (e.key === 'Escape') {
       if (globalState.commandPaletteOpen) {
         e.preventDefault();
         toggleCommandPalette(false);
+      }
+      if (globalState.themeModalOpen) {
+        e.preventDefault();
+        toggleThemeModal(false);
       }
     }
     // Ctrl+Space -> Orchestrator Bar

@@ -127,10 +127,19 @@ export const XtermWebGLPane: React.FC<Props> = ({
       }
     }, 50);
 
-    // Attach key event filter so app shortcuts (Ctrl+Space, Alt+M, Alt+E, Ctrl+T, etc.) bubble while terminal takes all other keystrokes
+    // Attach key event filter so app shortcuts (Ctrl+P, Cmd+D, Ctrl+, Ctrl+Space, Alt+I, Alt+M, Alt+E, Ctrl+T, etc.) bubble while terminal takes all other keystrokes
     term.attachCustomKeyEventHandler((e) => {
-      if (e.ctrlKey && (e.code === 'Space' || e.key === 'b' || e.key === 'B' || e.key === 't' || e.key === 'T' || e.key === 'Tab' || e.key === 'PageDown' || e.key === 'PageUp')) return false;
-      if (e.altKey && ['m', 'M', 'z', 'Z', 's', 'S', 'v', 'V', 'w', 'W', 'e', 'E', '1', '2', '3', '4', '5', '6', '7', '8', '9'].includes(e.key)) return false;
+      if ((e.ctrlKey || e.metaKey) && (
+        e.code === 'Space' ||
+        e.key === 'p' || e.key === 'P' ||
+        e.key === 'd' || e.key === 'D' ||
+        e.key === ',' ||
+        e.key === 'b' || e.key === 'B' ||
+        e.key === 't' || e.key === 'T' ||
+        e.key === 'Tab' ||
+        e.key === 'PageDown' || e.key === 'PageUp'
+      )) return false;
+      if (e.altKey && ['m', 'M', 'z', 'Z', 's', 'S', 'v', 'V', 'w', 'W', 'e', 'E', 'i', 'I', 'r', 'R', '1', '2', '3', '4', '5', '6', '7', '8', '9'].includes(e.key)) return false;
       return true;
     });
 
