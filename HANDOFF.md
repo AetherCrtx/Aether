@@ -139,40 +139,43 @@ M  ui/src/stores/aetherStore.ts                ← gate decode + getOpenCommandB
 
 ---
 
-## 🚧 Fase 2: Integrasi Fitur Warp (BELUM MULAI)
+## 🚀 Fase 2: Integrasi Fitur Warp (PROGRESS SIGNIFIKAN)
 
 **Referensi:** `.config/Hermes/composer-pastes/pasted_content_2026-10-23_18-33-19-778_13c5df.txt`
 
-### Sudah Ada (dari Master Prompt Lama)
-- ✅ Command Blocks (`CommandBlocksOverlay.tsx` — 188 lines, copy/bookmark/collapse)
-- ✅ ModernInputBar (`ModernInputBar.tsx` — 154 lines, `$ CMD` / `# AI` mode, ghost-text)
-- ✅ Workflows modal (`WorkflowsModal.tsx` — 169 lines, `Alt+R`, param parsing)
-- ✅ Error recovery banner (`ErrorRecoveryBanner.tsx` — 59 lines, deteksi `error[E`, `ERR!`, `Traceback`)
-- ✅ Pane view toggle (raw/blocks) di `AgentHeaderPill`
-- ✅ Pipeline banner + advance di `main.tsx`
+### ✅ Sudah Selesai di Fase 2
+- ✅ **Command Palette (`Ctrl+P` / `Cmd+P`)**:
+  - Modal fuzzy search untuk seluruh action: Agents & AI, Panes & Splits, Tabs, Git & Vault, dan Terminal.
+  - Keyboard navigation (`ArrowUp`/`ArrowDown`/`Enter`/`Escape`).
+  - Dinamis mendeteksi binary tools dari sistem.
+- ✅ **Split Panes (`Cmd+D` / `Cmd+Shift+D`)**:
+  - Shortcut `Cmd+D` (split vertical) dan `Cmd+Shift+D` (split horizontal).
+  - Bubbling key events diperbaiki di `XtermWebGLPane.tsx` agar xterm tidak mengonsumsi hotkeys global.
+- ✅ **Custom Tabs (`ChromeHeaderTabs.tsx`)**:
+  - Right-click context menu dengan 8 preset warna tab (Cyan, Blue, Purple, Pink, Emerald, Amber, Rose, Default).
+  - Indikator warna tab dinamis (glowing pip + colored top-border).
+  - Fitur "Duplicate Tab", "Close Other Tabs", dan double-click inline renaming.
+- ✅ **Environment & Git Charms (`ModernInputBar.tsx`)**:
+  - Chip CWD breadcrumbs / short directory.
+  - Git Branch charm dengan visual badge.
+  - Runtimes charm (Rust `🦀`, Node `⬢`).
+  - Last Command Exit Code charm (`✓ 0` / `✗ N`).
+- ✅ **Smart Autocomplete & Ghost Text (`ModernInputBar.tsx`)**:
+  - Ghost-text autosuggestion berbasis `recentCommandsFor` + fallback ke kumpulan preset CLI umum (`cargo check`, `npm run dev`, `git status`, dll).
+  - Auto-complete acceptance via `Tab` atau `Right Arrow` (saat kursor di akhir teks).
+- ✅ **Interactive Diff View (`DiffGatekeeperModal.tsx`)**:
+  - Sidebar per-file selection untuk memfilter unified diff hanya pada file yang dipilih.
+  - Search filter untuk list modified files.
+  - Tombol "Copy Diff" ke clipboard dengan visual checkmark.
+- ✅ **Theming & Appearance Engine (`Cmd+,` / `Ctrl+,`) (`ThemeModal.tsx` & `themes.ts`)**:
+  - 5 built-in theme presets: Tokyo Night, Catppuccin Mocha, Dracula, Nord, Cyberpunk Neon.
+  - Window transparency/opacity slider (0.4 - 1.0) untuk Wayland / Hyprland compositor blur.
+  - Live terminal palette preview & persistent state via `localStorage`.
 
-### Belum Ada (TODO Fase 2)
-- [ ] **Split Panes** (horizontal/vertical rekursif) — `Cmd+D` / `Cmd+Shift+D`
-- [ ] **Custom Tabs** (klik kanan → warna, double-click → rename)
-- [ ] **Command Palette** (`Cmd+P`) — modal fuzzy search untuk command/settings/pane
-- [ ] **Smart Autocomplete** — prediksi berbasis riwayat + konteks dir
-- [ ] **Environment & Git Charms** — chip status (Node/Python/Rust version, git branch, uncommitted changes)
-- [ ] **Interactive Diff View** — panel git diff per-file, revert changes, syntax highlighting
-- [ ] **Aether Drive Sidebar** (`Cmd+\`) — file tree, global search (ripgrep), saved workflows/prompts/notebooks, env vars
-- [ ] **Theming Engine** (`Cmd+,`) — built-in themes, custom YAML/JSON, background image/blur
-- [ ] **Input Position** — opsi bottom (modern) vs inline (classic)
-- [ ] **AI Agent Integration** — auto-detect input (shell vs natural language), multi-model picker, voice input, /conversations history
-- [ ] **Third-Party CLI Detection** — toolbar bantuan saat deteksi Claude Code / Codex / Aider
-- [ ] **SSH Session Persistence** — autocomplete & agent tetap jalan di remote
-
-### Prioritas Fase 2 (Recommendation)
-1. **Command Palette** — foundational UX, cepat build, high impact.
-2. **Split Panes** — core terminal feature, cukup banyak user minta.
-3. **Smart Autocomplete** — quality-of-life besar, pakai existing `recentCommandsFor()` di store.
-4. **Theming Engine** — cosmetic tapi bikin sticky, relatif isolated.
-5. **Aether Drive Sidebar** — besar, banyak subfeature, bisa incremental (file tree dulu, search/workflows belasan).
-
----
+### 📋 Sisa Roadmap Fase 2 (Next Iterations)
+- [ ] **Aether Drive Sidebar (`Cmd+\`)**: Tree view file manager, quick ripgrep search, prompt runbooks.
+- [ ] **AI Auto-detection Input**: Smart classifier perintah shell vs natural language prompt.
+- [ ] **SSH Session Persistence**: Autocomplete & agent bridge yang persist di sesi SSH remote.
 
 ## 📝 Notes untuk Session Berikutnya
 
