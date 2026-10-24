@@ -134,110 +134,114 @@ export const XtermWebGLPane: React.FC<Props> = ({
     // 3. Register CSI, OSC, and DCS capability handlers
     // Ensures interactive TUIs (agy, opencode, bubbletea, opentui, fzf, fish) receive
     // immediate terminal capability acknowledgements rather than blocking on stdin timeouts.
+    try {
+      // 3.1 Primary Device Attributes (DA1)
+      term.parser.registerCsiHandler({ final: 'c' }, (params) => {
+        const p = (params[0] as number) || 0;
+        if (p === 0) {
+          sendPtyInput(paneId, '\x1b[?1;2c');
+          return true;
+        }
+        return false;
+      });
 
-    // 3.1 Primary Device Attributes (DA1)
-    term.parser.registerCsiHandler({ final: 'c' }, (params) => {
-      const p = (params[0] as number) || 0;
-      if (p === 0) {
-        sendPtyInput(paneId, '\x1b[?1;2c');
+      // 3.2 Secondary Device Attributes (DA2)
+      term.parser.registerCsiHandler({ prefix: '>', final: 'c' }, () => {
+        sendPtyInput(paneId, '\x1b[>0;276;0c');
         return true;
-      }
-      return false;
-    });
+      });
 
-    // 3.2 Secondary Device Attributes (DA2)
-    term.parser.registerCsiHandler({ prefix: '>', final: 'c' }, () => {
-      sendPtyInput(paneId, '\x1b[>0;276;0c');
-      return true;
-    });
-
-    // 3.3 Kitty Progressive Keyboard Protocol Query (CSI ? u)
-    term.parser.registerCsiHandler({ prefix: '?', final: 'u' }, () => {
-      // Respond immediately that standard xterm keyboard mode is active (0 = no progressive flags)
-      sendPtyInput(paneId, '\x1b[?0u');
-      return true;
-    });
-
-    // 3.4 DECRQM (Request Mode: CSI ? Pn $ p) - Critical for agy & opencode
-    term.parser.registerCsiHandler({ prefix: '?', intermediates: '$', final: 'p' }, (params) => {
-      const mode = (params[0] as number) || 0;
-      if (mode === 2026) {
-        // Mode 2026 = Synchronized Output (supported and reset)
-        sendPtyInput(paneId, '\x1b[?2026;2$y');
-      } else if (mode === 2004) {
-        // Mode 2004 = Bracketed Paste (supported and set)
-        sendPtyInput(paneId, '\x1b[?2004;1$y');
-      } else if (mode === 1004) {
-        // Mode 1004 = Focus Reporting (supported and reset)
-        sendPtyInput(paneId, '\x1b[?1004;2$y');
-      } else if (mode === 1016) {
-        // Mode 1016 = SGR Mouse (supported and reset)
-        sendPtyInput(paneId, '\x1b[?1016;2$y');
-      } else {
-        // Mode not supported / unknown
-        sendPtyInput(paneId, `\x1b[?${mode};0$y`);
-      }
-      return true;
-    });
-
-    // 3.5 Terminal Version Query (XTVERSION: CSI > 0 q or CSI > q)
-    term.parser.registerCsiHandler({ prefix: '>', final: 'q' }, () => {
-      sendPtyInput(paneId, '\x1bP>|AetherTerminal(xterm.js)\x1b\\');
-      return true;
-    });
-
-    // 3.6 Window & Pixel Size Queries (CSI 14 t / CSI 18 t)
-    term.parser.registerCsiHandler({ final: 't' }, (params) => {
-      const p = (params[0] as number) || 0;
-      if (p === 14) {
-        // Query text area size in pixels
-        const cols = term.cols || 80;
-        const rows = term.rows || 24;
-        const width = cols * 9;
-        const height = rows * 18;
-        sendPtyInput(paneId, `\x1b[4;${height};${width}t`);
+      // 3.3 Kitty Progressive Keyboard Protocol Query (CSI ? u)
+      term.parser.registerCsiHandler({ prefix: '?', final: 'u' }, () => {
+        // Respond immediately that standard xterm keyboard mode is active (0 = no progressive flags)
+        sendPtyInput(paneId, '\x1b[?0u');
         return true;
-      } else if (p === 18) {
-        // Query text area size in characters
-        sendPtyInput(paneId, `\x1b[8;${term.rows || 24};${term.cols || 80}t`);
-        return true;
-      }
-      return false;
-    });
+      });
 
-    // 3.7 OSC 10 (Foreground Color Query: \x1b]10;?\x07 or \x1b]10;?\x1b\\)
-    term.parser.registerOscHandler(10, (data) => {
-      if (data === '?') {
-        sendPtyInput(paneId, '\x1b]10;rgb:c0c0/caca/f5f5\x1b\\');
+      // 3.4 DECRQM (Request Mode: CSI ? Pn $ p) - Critical for agy & opencode
+      term.parser.registerCsiHandler({ prefix: '?', intermediates: '$', final: 'p' }, (params) => {
+        const mode = (params[0] as number) || 0;
+        if (mode === 2026) {
+          // Mode 2026 = Synchronized Output (supported and reset)
+          sendPtyInput(paneId, '\x1b[?2026;2$y');
+        } else if (mode === 2004) {
+          // Mode 2004 = Bracketed Paste (supported and set)
+          sendPtyInput(paneId, '\x1b[?2004;1$y');
+        } else if (mode === 1004) {
+          // Mode 1004 = Focus Reporting (supported and reset)
+          sendPtyInput(paneId, '\x1b[?1004;2$y');
+        } else if (mode === 1016) {
+          // Mode 1016 = SGR Mouse (supported and reset)
+          sendPtyInput(paneId, '\x1b[?1016;2$y');
+        } else {
+          // Mode not supported / unknown
+          sendPtyInput(paneId, `\x1b[?${mode};0$y`);
+        }
         return true;
-      }
-      return false;
-    });
+      });
 
-    // 3.8 OSC 11 (Background Color Query: \x1b]11;?\x07 or \x1b]11;?\x1b\\)
-    term.parser.registerOscHandler(11, (data) => {
-      if (data === '?') {
-        sendPtyInput(paneId, '\x1b]11;rgb:1616/1616/1e1e\x1b\\');
+      // 3.5 Terminal Version Query (XTVERSION: CSI > 0 q or CSI > q)
+      term.parser.registerCsiHandler({ prefix: '>', final: 'q' }, () => {
+        sendPtyInput(paneId, '\x1bP>|AetherTerminal(xterm.js)\x1b\\');
         return true;
-      }
-      return false;
-    });
+      });
 
-    // 3.9 OSC 4 (Color Palette Query: \x1b]4;index;?\x07)
-    term.parser.registerOscHandler(4, (data) => {
-      if (data.includes('?')) {
-        sendPtyInput(paneId, '\x1b]4;0;rgb:1515/1616/1e1e\x1b\\');
+      // 3.6 Window & Pixel Size Queries (CSI 14 t / CSI 18 t)
+      term.parser.registerCsiHandler({ final: 't' }, (params) => {
+        const p = (params[0] as number) || 0;
+        if (p === 14) {
+          // Query text area size in pixels
+          const cols = term.cols || 80;
+          const rows = term.rows || 24;
+          const width = cols * 9;
+          const height = rows * 18;
+          sendPtyInput(paneId, `\x1b[4;${height};${width}t`);
+          return true;
+        } else if (p === 18) {
+          // Query text area size in characters
+          sendPtyInput(paneId, `\x1b[8;${term.rows || 24};${term.cols || 80}t`);
+          return true;
+        }
+        return false;
+      });
+
+      // 3.7 OSC 10 (Foreground Color Query: \x1b]10;?\x07 or \x1b]10;?\x1b\\)
+      term.parser.registerOscHandler(10, (data) => {
+        if (data === '?') {
+          sendPtyInput(paneId, '\x1b]10;rgb:c0c0/caca/f5f5\x1b\\');
+          return true;
+        }
+        return false;
+      });
+
+      // 3.8 OSC 11 (Background Color Query: \x1b]11;?\x07 or \x1b]11;?\x1b\\)
+      term.parser.registerOscHandler(11, (data) => {
+        if (data === '?') {
+          sendPtyInput(paneId, '\x1b]11;rgb:1616/1616/1e1e\x1b\\');
+          return true;
+        }
+        return false;
+      });
+
+      // 3.9 OSC 4 (Color Palette Query: \x1b]4;index;?\x07)
+      term.parser.registerOscHandler(4, (data) => {
+        if (data.includes('?')) {
+          sendPtyInput(paneId, '\x1b]4;0;rgb:1515/1616/1e1e\x1b\\');
+          return true;
+        }
+        return false;
+      });
+
+      // 3.10 DCS Handler for XTGETTCAP (\x1bP+q...ST)
+      // Note: '+' is an intermediate byte (\x20..\x2f), not a prefix (\x3c..\x3f)
+      term.parser.registerDcsHandler({ intermediates: '+', final: 'q' }, () => {
+        // Respond invalid XTGETTCAP response immediately to unblock prompt
+        sendPtyInput(paneId, '\x1bP0+r\x1b\\');
         return true;
-      }
-      return false;
-    });
-
-    // 3.10 DCS Handler for XTGETTCAP (\x1bP+q...ST)
-    term.parser.registerDcsHandler({ prefix: '+', final: 'q' }, () => {
-      // Respond invalid XTGETTCAP response immediately to unblock prompt
-      sendPtyInput(paneId, '\x1bP0+r\x1b\\');
-      return true;
-    });
+      });
+    } catch (e) {
+      console.warn('[AetherTerminal] Capability handler registration warning:', e);
+    }
 
     term.open(containerRef.current);
     termRef.current = term;

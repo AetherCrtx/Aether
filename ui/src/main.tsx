@@ -529,7 +529,61 @@ const App: React.FC = () => {
   );
 };
 
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('Unhandled React Error in AetherTerminal:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="w-screen h-screen bg-[#16161e] text-[#c0caf5] flex flex-col items-center justify-center p-8 select-none font-mono">
+          <div className="max-w-md w-full bg-slate-900/90 border border-red-500/40 rounded-xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-red-400 font-bold text-sm">
+              <span>⚠️ AetherTerminal UI Recovered</span>
+            </div>
+            <p className="text-xs text-slate-300">
+              {this.state.error?.message || 'An unexpected rendering error occurred.'}
+            </p>
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-semibold transition-colors"
+              >
+                Reload Window
+              </button>
+              <button
+                onClick={() => {
+                  localStorage.clear();
+                  window.location.reload();
+                }}
+                className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition-colors"
+              >
+                Reset State & Reload
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const rootElement = document.getElementById('root');
 if (rootElement) {
-  ReactDOM.createRoot(rootElement).render(<App />);
+  ReactDOM.createRoot(rootElement).render(
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  );
 }
