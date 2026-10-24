@@ -27,7 +27,7 @@
   --color-border: var(--cortex-border);
   --color-fg: var(--cortex-text);
   --color-fg-muted: var(--cortex-text-muted);
-  --color-blue: var(--cortex-accent);
+  --color-blue: #38BDF8;
   --color-cyan: var(--cortex-accent);
   --color-accent: var(--cortex-accent);
   --color-purple: #C084FC;
@@ -60,7 +60,7 @@
   --color-border: var(--cortex-border);
   --color-fg: var(--cortex-text);
   --color-fg-muted: var(--cortex-text-muted);
-  --color-blue: var(--cortex-accent);
+  --color-blue: #0284C7;
   --color-cyan: var(--cortex-accent);
   --color-accent: var(--cortex-accent);
   --color-purple: #9333EA;

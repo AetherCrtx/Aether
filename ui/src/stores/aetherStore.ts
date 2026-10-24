@@ -125,6 +125,100 @@ export interface AiMessage {
   error?: string;
 }
 
+export interface ChatHistoryEntry {
+  role: string;
+  content: string;
+}
+
+export interface AiSession {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  provider: string;
+  model: string;
+  systemPrompt?: string;
+  messages: AiMessage[];
+}
+
+export interface AiCommandDefinition {
+  command: string;
+  aliases?: string[];
+  syntax: string;
+  description: string;
+}
+
+export const AI_COMMANDS: AiCommandDefinition[] = [
+  {
+    command: '/help',
+    syntax: '/help',
+    description: 'Tampilkan daftar lengkap command yang tersedia',
+  },
+  {
+    command: '/new',
+    aliases: ['/session new', '/reset'],
+    syntax: '/new [judul]',
+    description: 'Mulai sesi chat baru yang bersih',
+  },
+  {
+    command: '/sessions',
+    aliases: ['/session list'],
+    syntax: '/sessions',
+    description: 'Tampilkan seluruh sesi percakapan tersimpan',
+  },
+  {
+    command: '/session switch',
+    syntax: '/session switch <id_atau_indeks>',
+    description: 'Beralih ke sesi percakapan tertentu',
+  },
+  {
+    command: '/session rename',
+    syntax: '/session rename <judul baru>',
+    description: 'Ganti judul sesi percakapan saat ini',
+  },
+  {
+    command: '/session delete',
+    syntax: '/session delete [id_atau_indeks]',
+    description: 'Hapus sesi percakapan tertentu atau sesi aktif',
+  },
+  {
+    command: '/clear',
+    syntax: '/clear',
+    description: 'Hapus semua pesan di dalam sesi ini',
+  },
+  {
+    command: '/model',
+    syntax: '/model <nama_model>',
+    description: 'Ganti model AI aktif (contoh: /model gpt-4o, /model Eris-Max)',
+  },
+  {
+    command: '/provider',
+    syntax: '/provider <nama_provider>',
+    description: 'Ganti provider AI aktif (contoh: /provider openai, /provider openrouter)',
+  },
+  {
+    command: '/system',
+    syntax: '/system [instruksi]',
+    description: 'Lihat atau atur system prompt untuk sesi ini',
+  },
+  {
+    command: '/context',
+    syntax: '/context',
+    description: 'Sertakan output terminal aktif ke dalam sesi chat',
+  },
+  {
+    command: '/status',
+    aliases: ['/info'],
+    syntax: '/status',
+    description: 'Informasi status koneksi provider, model, dan sesi saat ini',
+  },
+  {
+    command: '/export',
+    syntax: '/export',
+    description: 'Ekspor transkrip percakapan sesi ini ke format Markdown',
+  },
+];
+
 export interface ProviderMeta {
   id: string;
   name: string;
@@ -397,8 +491,70 @@ let globalState = {
         }
       })()
     : []) as CustomProviderConfig[],
+  aiSessions: (typeof localStorage !== 'undefined'
+    ? (() => {
+        try {
+          const val = localStorage.getItem('aether_ai_sessions');
+          if (val) {
+            const parsed = JSON.parse(val);
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          }
+        } catch {}
+        try {
+          const legacy = localStorage.getItem('aether_ai_messages');
+          const msgs = legacy ? JSON.parse(legacy) : [];
+          return [
+            {
+              id: 'session_default',
+              title: Array.isArray(msgs) && msgs.length > 0 ? 'Percakapan Sebelumnya' : 'Percakapan Utama',
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+              provider: 'openai',
+              model: 'gpt-4o',
+              messages: Array.isArray(msgs) ? msgs : [],
+            },
+          ];
+        } catch {
+          return [
+            {
+              id: 'session_default',
+              title: 'Percakapan Utama',
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+              provider: 'openai',
+              model: 'gpt-4o',
+              messages: [],
+            },
+          ];
+        }
+      })()
+    : [
+        {
+          id: 'session_default',
+          title: 'Percakapan Utama',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          provider: 'openai',
+          model: 'gpt-4o',
+          messages: [],
+        },
+      ]) as AiSession[],
+  activeAiSessionId: (typeof localStorage !== 'undefined'
+    && localStorage.getItem('aether_active_session_id'))
+    || 'session_default',
   aiMessages: (typeof localStorage !== 'undefined'
     ? (() => {
+        try {
+          const val = localStorage.getItem('aether_ai_sessions');
+          if (val) {
+            const parsed = JSON.parse(val);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              const activeId = localStorage.getItem('aether_active_session_id') || parsed[0].id;
+              const active = parsed.find((s: AiSession) => s.id === activeId) || parsed[0];
+              return active.messages || [];
+            }
+          }
+        } catch {}
         try {
           const val = localStorage.getItem('aether_ai_messages');
           return val ? (JSON.parse(val) as AiMessage[]) : [];
@@ -3016,29 +3172,347 @@ export function clearAiPilotSteps(paneId?: string): void {
 // Milestone 4: Collapsible AI Assistant Store Actions
 // ==========================================
 
-function persistAiMessages(): void {
+export function persistAiSessions(): void {
   if (typeof localStorage !== 'undefined') {
     try {
-      localStorage.setItem('aether_ai_messages', JSON.stringify(globalState.aiMessages));
+      localStorage.setItem('aether_ai_sessions', JSON.stringify(globalState.aiSessions));
+      localStorage.setItem('aether_active_session_id', globalState.activeAiSessionId);
+      if (globalState.aiMessages.length > 0) {
+        localStorage.setItem('aether_ai_messages', JSON.stringify(globalState.aiMessages));
+      } else {
+        localStorage.removeItem('aether_ai_messages');
+      }
     } catch (e) {
-      console.warn('Failed to persist AI messages to localStorage:', e);
+      console.warn('Failed to persist AI sessions to localStorage:', e);
     }
   }
 }
 
-export function clearAiMessages(): void {
+function persistAiMessages(): void {
+  persistAiSessions();
+}
+
+export function getActiveAiSession(): AiSession {
+  let session = globalState.aiSessions.find((s) => s.id === globalState.activeAiSessionId);
+  if (!session) {
+    if (globalState.aiSessions.length > 0) {
+      session = globalState.aiSessions[0];
+      globalState.activeAiSessionId = session.id;
+    } else {
+      session = {
+        id: `session_${Date.now()}`,
+        title: 'Percakapan Utama',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        provider: globalState.selectedAiProvider || 'openai',
+        model: globalState.selectedAiModel || 'gpt-4o',
+        messages: globalState.aiMessages,
+      };
+      globalState.aiSessions.push(session);
+      globalState.activeAiSessionId = session.id;
+    }
+  }
+
+  // If globalState.aiMessages was externally cleared, keep active session in sync
+  if (globalState.aiMessages.length === 0 && session.messages.length > 0) {
+    session.messages = [];
+  }
+
+  return session;
+}
+
+export function createAiSession(title?: string, provider?: string, model?: string): string {
+  const id = `session_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  const newSession: AiSession = {
+    id,
+    title: title?.trim() || `Sesi ${globalState.aiSessions.length + 1}`,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    provider: provider || globalState.selectedAiProvider || 'openai',
+    model: model || globalState.selectedAiModel || 'gpt-4o',
+    messages: [],
+  };
+  globalState.aiSessions.unshift(newSession);
+  globalState.activeAiSessionId = id;
+  globalState.aiMessages = [];
+  globalState.aiError = null;
+  globalState.aiLoading = false;
+  persistAiSessions();
+  notify();
+  return id;
+}
+
+export function switchAiSession(sessionId: string): void {
+  const session = globalState.aiSessions.find((s) => s.id === sessionId);
+  if (!session) return;
+  globalState.activeAiSessionId = sessionId;
+  globalState.aiMessages = session.messages || [];
+  if (session.provider) {
+    globalState.selectedAiProvider = session.provider;
+  }
+  if (session.model) {
+    globalState.selectedAiModel = session.model;
+  }
+  globalState.aiError = null;
+  globalState.aiLoading = false;
+  persistAiSessions();
+  notify();
+}
+
+export function renameAiSession(sessionId: string, newTitle: string): void {
+  const session = globalState.aiSessions.find((s) => s.id === sessionId);
+  if (!session) return;
+  const trimmed = newTitle.trim();
+  if (!trimmed) return;
+  session.title = trimmed;
+  session.updatedAt = Date.now();
+  persistAiSessions();
+  notify();
+}
+
+export function deleteAiSession(sessionId?: string): void {
+  const targetId = sessionId || globalState.activeAiSessionId;
+  const index = globalState.aiSessions.findIndex((s) => s.id === targetId);
+  if (index === -1) return;
+
+  globalState.aiSessions.splice(index, 1);
+  if (globalState.aiSessions.length === 0) {
+    const freshId = `session_${Date.now()}`;
+    const fresh: AiSession = {
+      id: freshId,
+      title: 'Percakapan Utama',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      provider: globalState.selectedAiProvider || 'openai',
+      model: globalState.selectedAiModel || 'gpt-4o',
+      messages: [],
+    };
+    globalState.aiSessions.push(fresh);
+    globalState.activeAiSessionId = freshId;
+    globalState.aiMessages = [];
+  } else {
+    if (globalState.activeAiSessionId === targetId) {
+      const nextSession = globalState.aiSessions[Math.min(index, globalState.aiSessions.length - 1)];
+      globalState.activeAiSessionId = nextSession.id;
+      globalState.aiMessages = nextSession.messages || [];
+    }
+  }
+  persistAiSessions();
+  notify();
+}
+
+export function clearCurrentAiSession(): void {
+  const session = getActiveAiSession();
+  session.messages = [];
+  session.updatedAt = Date.now();
   globalState.aiMessages = [];
   globalState.aiLoading = false;
   globalState.aiError = null;
   globalState.aiPendingContext = null;
-  if (typeof localStorage !== 'undefined') {
-    try {
-      localStorage.removeItem('aether_ai_messages');
-    } catch (e) {
-      console.warn('Failed to clear AI messages from localStorage:', e);
-    }
-  }
+  persistAiSessions();
   notify();
+}
+
+export function clearAiMessages(): void {
+  clearCurrentAiSession();
+}
+
+export async function executeAiCommand(commandLine: string): Promise<{ handled: boolean; output?: string }> {
+  const raw = commandLine.trim();
+  if (!raw.startsWith('/')) {
+    return { handled: false };
+  }
+
+  const parts = raw.slice(1).split(/\s+/);
+  const root = parts[0]?.toLowerCase();
+  const sub = parts[1]?.toLowerCase();
+  const args = parts.slice(sub ? 2 : 1).join(' ').trim();
+
+  const appendOutput = (content: string, cards?: Array<{ key: string; value: string }>) => {
+    const sysMsg: AiMessage = {
+      id: `cmd_out_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      role: 'system',
+      content,
+      timestamp: Date.now(),
+      metadata: cards ? { cards } : undefined,
+    };
+    const session = getActiveAiSession();
+    session.messages.push(sysMsg);
+    session.updatedAt = Date.now();
+    globalState.aiMessages.push(sysMsg);
+    persistAiSessions();
+    notify();
+  };
+
+  if (root === 'help') {
+    let out = `### Daftar Command AetherCortex AI\n\n`;
+    for (const cmd of AI_COMMANDS) {
+      out += `- \`${cmd.syntax}\` — ${cmd.description}\n`;
+    }
+    out += `\n*Tips: Ketik \`/\` pada kolom input untuk melihat daftar saran command secara langsung.*`;
+    appendOutput(out);
+    return { handled: true, output: out };
+  }
+
+  if (root === 'new' || root === 'reset' || (root === 'session' && sub === 'new')) {
+    const title = root === 'session' ? args : parts.slice(1).join(' ').trim();
+    const newId = createAiSession(title || undefined);
+    const active = getActiveAiSession();
+    appendOutput(`Sesi baru **${active.title}** (\`${newId}\`) telah dibuat dan aktif.`);
+    return { handled: true };
+  }
+
+  if (root === 'sessions' || (root === 'session' && (!sub || sub === 'list'))) {
+    let out = `### Sesi Percakapan AetherCortex (${globalState.aiSessions.length})\n\n`;
+    globalState.aiSessions.forEach((s, idx) => {
+      const isCurrent = s.id === globalState.activeAiSessionId;
+      const marker = isCurrent ? '**[AKTIF]** ' : '';
+      const timeStr = new Date(s.updatedAt).toLocaleTimeString();
+      out += `${idx + 1}. ${marker}**${s.title}** — \`${s.messages.length} pesan\` (ID: \`${s.id}\`, diperbarui ${timeStr})\n`;
+    });
+    out += `\n*Gunakan \`/session switch <id_atau_nomor>\` untuk berpindah sesi.*`;
+    appendOutput(out);
+    return { handled: true, output: out };
+  }
+
+  if (root === 'session' && sub === 'switch') {
+    const target = args || parts[2];
+    if (!target) {
+      appendOutput(`Sintaks salah. Contoh: \`/session switch 1\` atau \`/session switch session_123\``);
+      return { handled: true };
+    }
+    const num = parseInt(target, 10);
+    let targetSession: AiSession | undefined;
+    if (!isNaN(num) && num >= 1 && num <= globalState.aiSessions.length) {
+      targetSession = globalState.aiSessions[num - 1];
+    } else {
+      targetSession = globalState.aiSessions.find((s) => s.id === target || s.id.includes(target));
+    }
+    if (!targetSession) {
+      appendOutput(`Sesi dengan ID/indeks "${target}" tidak ditemukan.`);
+      return { handled: true };
+    }
+    switchAiSession(targetSession.id);
+    appendOutput(`Beralih ke sesi **${targetSession.title}** (\`${targetSession.id}\`).`);
+    return { handled: true };
+  }
+
+  if (root === 'session' && sub === 'rename') {
+    const newTitle = args || parts.slice(2).join(' ').trim();
+    if (!newTitle) {
+      appendOutput(`Sintaks salah. Contoh: \`/session rename Debugging Server API\``);
+      return { handled: true };
+    }
+    renameAiSession(globalState.activeAiSessionId, newTitle);
+    appendOutput(`Judul sesi berhasil diubah menjadi **${newTitle}**.`);
+    return { handled: true };
+  }
+
+  if (root === 'session' && sub === 'delete') {
+    const target = args || parts[2];
+    let targetId = globalState.activeAiSessionId;
+    if (target) {
+      const num = parseInt(target, 10);
+      if (!isNaN(num) && num >= 1 && num <= globalState.aiSessions.length) {
+        targetId = globalState.aiSessions[num - 1].id;
+      } else {
+        const found = globalState.aiSessions.find((s) => s.id === target || s.id.includes(target));
+        if (found) targetId = found.id;
+      }
+    }
+    deleteAiSession(targetId);
+    appendOutput(`Sesi \`${targetId}\` telah dihapus.`);
+    return { handled: true };
+  }
+
+  if (root === 'clear') {
+    clearCurrentAiSession();
+    appendOutput(`Riwayat percakapan pada sesi ini telah dibersihkan.`);
+    return { handled: true };
+  }
+
+  if (root === 'model') {
+    const modelName = parts.slice(1).join(' ').trim();
+    if (!modelName) {
+      appendOutput(`Model saat ini: **${globalState.selectedAiModel}**\nGunakan: \`/model <nama_model>\` untuk mengganti.`);
+      return { handled: true };
+    }
+    setSelectedAiModel(modelName);
+    const session = getActiveAiSession();
+    session.model = modelName;
+    persistAiSessions();
+    appendOutput(`Model aktif berhasil diubah ke **${modelName}**.`);
+    return { handled: true };
+  }
+
+  if (root === 'provider') {
+    const provName = parts.slice(1).join(' ').trim();
+    if (!provName) {
+      appendOutput(`Provider saat ini: **${globalState.selectedAiProvider}**\nGunakan: \`/provider <nama_provider>\` untuk mengganti.`);
+      return { handled: true };
+    }
+    setSelectedAiProvider(provName);
+    const session = getActiveAiSession();
+    session.provider = provName;
+    persistAiSessions();
+    appendOutput(`Provider aktif berhasil diubah ke **${provName}**.`);
+    return { handled: true };
+  }
+
+  if (root === 'system') {
+    const promptText = parts.slice(1).join(' ').trim();
+    const session = getActiveAiSession();
+    if (!promptText) {
+      const cur = session.systemPrompt || 'Standar (AetherCortex AI Terminal)';
+      appendOutput(`### System Prompt Sesi Ini\n\n\`\`\`\n${cur}\n\`\`\`\nGunakan \`/system <instruksi>\` untuk mengubah.`);
+      return { handled: true };
+    }
+    session.systemPrompt = promptText;
+    persistAiSessions();
+    appendOutput(`System prompt sesi ini berhasil diperbarui.`);
+    return { handled: true };
+  }
+
+  if (root === 'context') {
+    insertTerminalContextToAi();
+    return { handled: true };
+  }
+
+  if (root === 'status' || root === 'info') {
+    const session = getActiveAiSession();
+    const prov = globalState.selectedAiProvider;
+    const mod = globalState.selectedAiModel;
+    const cardData = [
+      { key: 'Sesi Aktif', value: session.title },
+      { key: 'Session ID', value: session.id },
+      { key: 'Provider', value: prov },
+      { key: 'Model', value: mod },
+      { key: 'Total Pesan', value: String(session.messages.length) },
+      { key: 'Dibuat', value: new Date(session.createdAt).toLocaleTimeString() },
+    ];
+    let out = `### Status AI Assistant\n\n`;
+    out += `- **Sesi**: ${session.title} (\`${session.id}\`)\n`;
+    out += `- **Provider**: \`${prov}\`\n`;
+    out += `- **Model**: \`${mod}\`\n`;
+    out += `- **Jumlah Pesan**: ${session.messages.length}\n`;
+    appendOutput(out, cardData);
+    return { handled: true, output: out };
+  }
+
+  if (root === 'export') {
+    const session = getActiveAiSession();
+    let md = `# Transkrip Sesi: ${session.title}\n\n`;
+    md += `*Provider: ${session.provider} | Model: ${session.model} | Waktu: ${new Date(session.updatedAt).toLocaleString()}*\n\n---\n\n`;
+    for (const m of session.messages) {
+      const author = m.role === 'user' ? '**User**' : m.role === 'assistant' ? '**Assistant**' : '**System**';
+      md += `### ${author} (${new Date(m.timestamp).toLocaleTimeString()})\n\n${m.content}\n\n`;
+    }
+    appendOutput(`### Transkrip Sesi Diekspor\n\n\`\`\`markdown\n${md}\n\`\`\``);
+    return { handled: true };
+  }
+
+  appendOutput(`Command \`/${root}\` tidak dikenali. Ketik \`/help\` untuk melihat daftar command yang tersedia.`);
+  return { handled: true };
 }
 
 export function setAiLoading(loading: boolean): void {
@@ -3095,14 +3569,16 @@ export function insertTerminalContextToAi(paneId?: string): void {
     },
   };
 
+  const session = getActiveAiSession();
+  session.messages.push(contextMsg);
+  session.updatedAt = Date.now();
   globalState.aiMessages.push(contextMsg);
   globalState.aiPendingContext = content;
-  // Ensure the AI Assistant panel is opened so the user immediately sees the attached context
   globalState.aiAssistantOpen = true;
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem('aether_ai_assistant_open', 'true');
   }
-  persistAiMessages();
+  persistAiSessions();
   notify();
 }
 
@@ -3124,8 +3600,28 @@ export async function sendAiMessage(prompt: string): Promise<void> {
   const trimmed = prompt.trim();
   if (!trimmed) return;
 
+  // Check for slash commands
+  if (trimmed.startsWith('/')) {
+    const userCmdMsg: AiMessage = {
+      id: `msg_cmd_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      role: 'user',
+      content: trimmed,
+      timestamp: Date.now(),
+    };
+    const session = getActiveAiSession();
+    session.messages.push(userCmdMsg);
+    session.updatedAt = Date.now();
+    globalState.aiMessages.push(userCmdMsg);
+    persistAiSessions();
+    notify();
+
+    await executeAiCommand(trimmed);
+    return;
+  }
+
   const provider = globalState.selectedAiProvider || 'openai';
   const model = globalState.selectedAiModel || 'gpt-4o';
+  const session = getActiveAiSession();
 
   // 1. Append user message
   const userMsg: AiMessage = {
@@ -3134,10 +3630,19 @@ export async function sendAiMessage(prompt: string): Promise<void> {
     content: trimmed,
     timestamp: Date.now(),
   };
-  globalState.aiMessages.push(userMsg);
+
+  session.messages.push(userMsg);
+  session.updatedAt = Date.now();
+  // Auto-title session if it has default title and this is the first user message
+  const userMsgs = session.messages.filter((m) => m.role === 'user');
+  if (userMsgs.length === 1 && (session.title === 'Percakapan Utama' || session.title.startsWith('Sesi '))) {
+    session.title = trimmed.length > 28 ? trimmed.slice(0, 28) + '...' : trimmed;
+  }
+
+  globalState.aiMessages = session.messages;
   globalState.aiLoading = true;
   globalState.aiError = null;
-  persistAiMessages();
+  persistAiSessions();
   notify();
 
   const startTime = Date.now();
@@ -3163,8 +3668,9 @@ export async function sendAiMessage(prompt: string): Promise<void> {
         ],
       },
     };
-    globalState.aiMessages.push(errorAssistantMsg);
-    persistAiMessages();
+    session.messages.push(errorAssistantMsg);
+    globalState.aiMessages = session.messages;
+    persistAiSessions();
     notify();
     return;
   }
@@ -3173,11 +3679,18 @@ export async function sendAiMessage(prompt: string): Promise<void> {
     let assistantReply = '';
     if (isRunningInTauri()) {
       try {
+        // Collect multi-turn conversational history for the session
+        const history: ChatHistoryEntry[] = session.messages
+          .slice(0, -1) // all except the one just pushed
+          .filter((m) => m.role === 'user' || m.role === 'assistant')
+          .map((m) => ({ role: m.role, content: m.content }));
+
         const res = await invoke('cmd_ai_chat', {
           provider,
           model,
           prompt: trimmed,
-          system_prompt: 'You are AetherCortex AI Assistant, a high-performance terminal and systems assistant.',
+          system_prompt: session.systemPrompt || 'You are AetherCortex AI Assistant, a high-performance terminal and systems assistant.',
+          history,
         });
         assistantReply = typeof res === 'string' ? res : (res?.content || JSON.stringify(res));
       } catch (err: any) {
@@ -3212,11 +3725,13 @@ export async function sendAiMessage(prompt: string): Promise<void> {
       },
     };
 
-    globalState.aiMessages.push(assistantMsg);
+    session.messages.push(assistantMsg);
+    session.updatedAt = Date.now();
+    globalState.aiMessages = session.messages;
     globalState.aiLoading = false;
     globalState.aiError = null;
     globalState.aiPendingContext = null;
-    persistAiMessages();
+    persistAiSessions();
     notify();
   } catch (err: any) {
     const errorMsg = err?.message || String(err) || 'Failed to complete AI request.';
@@ -3239,8 +3754,10 @@ export async function sendAiMessage(prompt: string): Promise<void> {
         ],
       },
     };
-    globalState.aiMessages.push(errorAssistantMsg);
-    persistAiMessages();
+    session.messages.push(errorAssistantMsg);
+    session.updatedAt = Date.now();
+    globalState.aiMessages = session.messages;
+    persistAiSessions();
     notify();
   }
 }

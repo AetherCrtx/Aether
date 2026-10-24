@@ -1114,6 +1114,7 @@ async fn process_request(ctx: &DaemonContext, req: IpcRequest) -> IpcResponse {
             model,
             prompt,
             system_prompt,
+            history,
         } => {
             let config = aetherd::ai_pilot::load_provider_config().unwrap_or_default();
             let p_key = provider.to_lowercase();
@@ -1134,7 +1135,19 @@ async fn process_request(ctx: &DaemonContext, req: IpcRequest) -> IpcResponse {
             let client = aetherd::ai_pilot::AiPilotClient::new();
             let mut messages = Vec::new();
             if let Some(sys) = system_prompt {
-                messages.push(aetherd::ai_pilot::ChatMessage::system(sys));
+                if !sys.trim().is_empty() {
+                    messages.push(aetherd::ai_pilot::ChatMessage::system(sys));
+                }
+            }
+            if let Some(hist) = history {
+                for item in hist {
+                    match item.role.as_str() {
+                        "user" => messages.push(aetherd::ai_pilot::ChatMessage::user(item.content)),
+                        "assistant" => messages.push(aetherd::ai_pilot::ChatMessage::assistant(Some(item.content), None)),
+                        "system" => messages.push(aetherd::ai_pilot::ChatMessage::system(item.content)),
+                        _ => messages.push(aetherd::ai_pilot::ChatMessage::user(item.content)),
+                    }
+                }
             }
             messages.push(aetherd::ai_pilot::ChatMessage::user(prompt));
             match client.chat_completion(&provider, &settings, &messages, &[]).await {

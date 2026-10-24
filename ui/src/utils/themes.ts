@@ -391,24 +391,29 @@ export function applyTheme(themeId: string, opacity: number = 0.95): AetherTheme
   const theme = AETHER_THEMES.find((t) => t.id === themeId) || AETHER_THEMES[0];
   const root = document.documentElement;
 
+  const isLight =
+    theme.id.includes('light') || theme.id.includes('latte') || theme.id.includes('day');
+
   root.style.setProperty('--color-bg', theme.bg);
   root.style.setProperty('--color-bg-dark', theme.bgDark);
   root.style.setProperty('--color-panel', theme.panel);
   root.style.setProperty('--color-border', theme.border);
   root.style.setProperty('--color-fg', theme.fg);
-  root.style.setProperty('--color-blue', theme.accent);
+  root.style.setProperty('--color-fg-muted', isLight ? '#3B5B82' : '#7096BD');
+  root.style.setProperty('--color-blue', isLight ? '#0284C7' : '#38BDF8');
   root.style.setProperty('--color-cyan', theme.accent);
   root.style.setProperty('--color-accent', theme.accent);
 
   root.style.setProperty('--cortex-bg', theme.bgDark);
   root.style.setProperty('--cortex-bg-alt', theme.bg);
   root.style.setProperty('--cortex-surface-1', theme.panel);
+  root.style.setProperty('--cortex-surface-2', isLight ? '#E5E9EC' : '#121A1F');
   root.style.setProperty('--cortex-border', theme.border);
   root.style.setProperty('--cortex-text', theme.fg);
+  root.style.setProperty('--cortex-text-muted', isLight ? '#3B5B82' : '#7096BD');
+  root.style.setProperty('--cortex-text-bright', isLight ? '#1D4ED8' : '#BFDBFE');
   root.style.setProperty('--cortex-accent', theme.accent);
 
-  const isLight =
-    theme.id.includes('light') || theme.id.includes('latte') || theme.id.includes('day');
   if (isLight) {
     root.classList.add('light-mode');
     root.classList.remove('dark-mode');

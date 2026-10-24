@@ -161,6 +161,8 @@ pub enum IpcRequestPayload {
         model: Option<String>,
         prompt: String,
         system_prompt: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        history: Option<Vec<ChatHistoryEntry>>,
     },
 }
 
@@ -358,6 +360,12 @@ pub enum IpcResponsePayload {
     AiChatResult {
         content: String,
     },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ChatHistoryEntry {
+    pub role: String,
+    pub content: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

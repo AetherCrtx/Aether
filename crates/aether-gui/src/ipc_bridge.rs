@@ -1,7 +1,7 @@
 use aether_protocol::agent::{BlackboardEntryType, CliType};
 use aether_protocol::ipc::async_codec::{read_ipc_message, write_ipc_message};
 use aether_protocol::ipc::{
-    ClaimModuleRequest, CreateSnapshotRequest, IpcEvent, IpcMessage, IpcRequest, IpcRequestPayload,
+    ChatHistoryEntry, ClaimModuleRequest, CreateSnapshotRequest, IpcEvent, IpcMessage, IpcRequest, IpcRequestPayload,
     IpcResponsePayload, MergeWorktreeRequest, ObsidianReadNoteRequest,
     ObsidianUpdateTaskRequest, PaneSpawnedInfo, PaneSummary, ProviderConfig, PtyInputRequest, PublishBlackboardRequest,
     ReleaseModuleRequest, ResizePaneRequest, RollbackSnapshotRequest, SharedContextSummary,
@@ -1361,6 +1361,7 @@ pub async fn cmd_ai_chat(
     model: Option<String>,
     prompt: String,
     system_prompt: Option<String>,
+    history: Option<Vec<ChatHistoryEntry>>,
     state: State<'_, GuiBridgeState>,
 ) -> Result<String, String> {
     let payload = IpcRequestPayload::AiChat {
@@ -1368,6 +1369,7 @@ pub async fn cmd_ai_chat(
         model,
         prompt,
         system_prompt,
+        history,
     };
     match state.send_request(payload).await? {
         IpcResponsePayload::AiChatResult { content } => Ok(content),

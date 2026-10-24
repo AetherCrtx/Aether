@@ -345,7 +345,7 @@ const WorkspaceDrivePanel: React.FC = () => {
           }}
           className={`group flex items-center gap-1.5 py-1 px-2 cursor-pointer transition-colors text-xs font-mono ${
             isSelected
-              ? 'bg-cortex-accent/10 text-cortex-accent border-l-2 border-cortex-accent'
+              ? 'bg-sky-500/10 text-sky-300 font-semibold border-l-2 border-cortex-accent'
               : 'hover:bg-cortex-surface2 text-cortex-textMuted hover:text-cortex-text'
           }`}
           style={{ paddingLeft: `${depth * 12 + 8}px` }}
@@ -417,7 +417,7 @@ const WorkspaceDrivePanel: React.FC = () => {
           onClick={() => setAetherDriveActiveTab('tree')}
           className={`flex-1 py-2 flex items-center justify-center gap-1 transition-colors border-b-2 font-semibold ${
             store.aetherDriveActiveTab === 'tree'
-              ? 'border-cortex-accent text-cortex-accent'
+              ? 'border-cortex-accent text-sky-300'
               : 'border-transparent text-cortex-textMuted hover:text-cortex-text'
           }`}
           data-testid="tab-tree"
@@ -430,7 +430,7 @@ const WorkspaceDrivePanel: React.FC = () => {
           onClick={() => setAetherDriveActiveTab('search')}
           className={`flex-1 py-2 flex items-center justify-center gap-1 transition-colors border-b-2 font-semibold ${
             store.aetherDriveActiveTab === 'search'
-              ? 'border-cortex-accent text-cortex-accent'
+              ? 'border-cortex-accent text-sky-300'
               : 'border-transparent text-cortex-textMuted hover:text-cortex-text'
           }`}
           data-testid="tab-search"
@@ -443,7 +443,7 @@ const WorkspaceDrivePanel: React.FC = () => {
           onClick={() => setAetherDriveActiveTab('workflows')}
           className={`flex-1 py-2 flex items-center justify-center gap-1 transition-colors border-b-2 font-semibold ${
             store.aetherDriveActiveTab === 'workflows'
-              ? 'border-cortex-accent text-cortex-accent'
+              ? 'border-cortex-accent text-sky-300'
               : 'border-transparent text-cortex-textMuted hover:text-cortex-text'
           }`}
           data-testid="tab-workflows"

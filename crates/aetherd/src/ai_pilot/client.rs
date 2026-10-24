@@ -177,11 +177,19 @@ impl AiPilotClient {
         default_base_url: &str,
         is_openrouter: bool,
     ) -> Result<ChatResponse, String> {
-        let raw_base = settings
+        let mut raw_base = settings
             .base_url
             .as_deref()
             .unwrap_or(default_base_url)
-            .trim();
+            .trim()
+            .to_string();
+        if raw_base.starts_with("http://localhost:") {
+            raw_base = raw_base.replacen("http://localhost:", "http://127.0.0.1:", 1);
+        } else if raw_base.starts_with("https://localhost:") {
+            raw_base = raw_base.replacen("https://localhost:", "https://127.0.0.1:", 1);
+        } else if raw_base == "http://localhost" || raw_base == "http://localhost/" {
+            raw_base = "http://127.0.0.1".to_string();
+        }
         let trimmed = raw_base.trim_end_matches('/');
         let url = if trimmed.ends_with("/chat/completions") {
             trimmed.to_string()
@@ -217,7 +225,8 @@ impl AiPilotClient {
             "model": settings.model,
             "messages": messages,
             "temperature": 0.2,
-            "max_tokens": 1000,
+            "max_tokens": 2048,
+            "stream": false,
         });
 
         if !tools.is_empty() {
@@ -266,10 +275,22 @@ impl AiPilotClient {
                         })?;
 
                     let message = choice.get("message").ok_or("Missing message in choice")?;
-                    let content = message
+                    let raw_content = message
                         .get("content")
                         .and_then(|c| c.as_str())
                         .map(|s| s.to_string());
+
+                    let content = raw_content.map(|mut s| {
+                        if let Some(_start) = s.find("<thinking>") {
+                            if let Some(end) = s.find("</thinking>") {
+                                let after = s[end + 11..].trim();
+                                if !after.is_empty() {
+                                    s = after.to_string();
+                                }
+                            }
+                        }
+                        s
+                    });
 
                     let mut tool_calls = Vec::new();
                     if let Some(tcs) = message.get("tool_calls").and_then(|t| t.as_array()) {

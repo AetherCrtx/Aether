@@ -9,8 +9,14 @@ import {
   setSelectedAiProvider,
   setSelectedAiModel,
   BUILT_IN_PROVIDERS,
+  createAiSession,
+  switchAiSession,
+  renameAiSession,
+  deleteAiSession,
+  clearCurrentAiSession,
+  AI_COMMANDS,
 } from '../stores/aetherStore';
-import type { AiMessage } from '../stores/aetherStore';
+import type { AiMessage, AiSession, AiCommandDefinition } from '../stores/aetherStore';
 import {
   Sparkles,
   ChevronUp,
@@ -22,6 +28,11 @@ import {
   Check,
   AlertCircle,
   RotateCcw,
+  Plus,
+  MessageSquare,
+  Edit2,
+  X,
+  Command,
 } from 'lucide-react';
 
 export interface AiAssistantPanelProps {
@@ -50,7 +61,7 @@ function highlightCodeLine(line: string): React.ReactNode[] {
     const after = line.slice(promptIdx + 2);
     return [
       before ? <span key="b">{before}</span> : null,
-      <span key="prompt" className="text-cortex-accent font-bold select-none">$ </span>,
+      <span key="prompt" className="text-sky-300 font-bold select-none">$ </span>,
       ...tokenizeLine(after, 'cmd-')
     ];
   }
@@ -74,7 +85,7 @@ function tokenizeLine(line: string, prefix: string): React.ReactNode[] {
     } else if (/^\d+$/.test(token)) {
       tokens.push(<span key={key} className="text-cortex-warning font-mono">{token}</span>);
     } else if (KEYWORDS.has(token.toLowerCase())) {
-      tokens.push(<span key={key} className="text-cortex-accent font-semibold">{token}</span>);
+      tokens.push(<span key={key} className="text-sky-300 font-semibold">{token}</span>);
     } else {
       tokens.push(<span key={key} className="text-cortex-text">{token}</span>);
     }
@@ -100,7 +111,7 @@ export const CodeBlock: React.FC<{ code: string; language?: string }> = ({ code,
   return (
     <div className="my-2 border border-cortex-border bg-cortex-bg rounded-lg overflow-hidden font-mono text-xs select-text">
       <div className="h-7 px-2.5 bg-cortex-surface2 border-b border-cortex-border flex items-center justify-between text-[10px] text-cortex-textMuted select-none">
-        <span className="font-bold tracking-wider uppercase text-cortex-accent" data-testid="code-language-tag">
+        <span className="font-bold tracking-wider uppercase text-sky-300" data-testid="code-language-tag">
           {language || 'CODE'}
         </span>
         <button
@@ -160,7 +171,7 @@ function parseInlineFormatting(text: string): React.ReactNode[] {
     const token = match[0];
     if (token.startsWith('`') && token.endsWith('`')) {
       elements.push(
-        <code key={`code-${keyIndex++}`} className="font-mono bg-cortex-surface2 px-1.5 py-0.5 text-cortex-accent text-[11px] border border-cortex-border rounded font-medium">
+        <code key={`code-${keyIndex++}`} className="font-mono bg-cortex-surface2 px-1.5 py-0.5 text-sky-300 text-[11px] border border-cortex-border rounded font-medium">
           {token.slice(1, -1)}
         </code>
       );
@@ -233,7 +244,7 @@ export const MarkdownContent: React.FC<{ content: string }> = ({ content }) => {
           }
           if (trimmed.startsWith('## ')) {
             flushList();
-            elements.push(<h2 key={`h2-${lineIdx}`} className="text-xs font-bold text-cortex-accent uppercase tracking-wide mt-2 mb-1">{parseInlineFormatting(trimmed.slice(3))}</h2>);
+            elements.push(<h2 key={`h2-${lineIdx}`} className="text-xs font-bold text-sky-300 uppercase tracking-wide mt-2 mb-1">{parseInlineFormatting(trimmed.slice(3))}</h2>);
             return;
           }
           if (trimmed.startsWith('### ')) {
@@ -245,7 +256,7 @@ export const MarkdownContent: React.FC<{ content: string }> = ({ content }) => {
             inList = true;
             listItems.push(
               <li key={`li-${lineIdx}`} className="flex items-start gap-2">
-                <span className="text-cortex-accent select-none font-bold mt-0.5">•</span>
+                <span className="text-sky-400 select-none font-bold mt-0.5">•</span>
                 <div className="flex-1">{parseInlineFormatting(trimmed.slice(2))}</div>
               </li>
             );
@@ -276,35 +287,32 @@ export const MarkdownContent: React.FC<{ content: string }> = ({ content }) => {
 };
 
 // ==========================================
-// Neo-Brutalist Key-Value Info Cards matching reference
+// Neo-Brutalist Key-Value Info Cards
 // ==========================================
 
 export const InfoCards: React.FC<{ cards?: Array<{ key: string; value: string }> }> = ({ cards }) => {
   if (!cards || cards.length === 0) return null;
 
-  // Split cards into System Information, Hardware, and Disk Usage groups if large
   const systemInfoCards = cards.slice(0, 8);
   const hardwareCards = cards.slice(8, 11);
   const diskCards = cards.slice(11);
 
   return (
     <div
-      className="mt-3 p-4 bg-[#050D11] border border-[#0F222B] rounded-xl relative overflow-hidden border-r-2 border-r-[#00F0FF] shadow-[0_4px_20px_rgba(0,0,0,0.5)]"
+      className="mt-3 p-4 bg-[#050D11] border border-[#0F222B] rounded-xl relative overflow-hidden border-r-2 border-r-[#38BDF8] shadow-[0_4px_20px_rgba(0,0,0,0.5)]"
       data-testid="ai-info-cards"
     >
-      {/* Right accent indicator line matching Image 2 */}
-      <div className="absolute right-0 top-3 bottom-3 w-[2px] bg-[#00F0FF] shadow-[0_0_8px_#00F0FF]" />
+      <div className="absolute right-0 top-3 bottom-3 w-[2px] bg-[#38BDF8] shadow-[0_0_8px_#38BDF8]" />
 
       <div className="space-y-3 font-mono text-xs">
-        {/* System Information */}
         <div>
-          <span className="text-xs font-bold text-cortex-accent tracking-wider block mb-1.5 font-sans">
+          <span className="text-xs font-bold text-sky-300 tracking-wider block mb-1.5 font-sans">
             System Information
           </span>
           <div className="space-y-0.5 text-[11px]">
             {systemInfoCards.map((c, idx) => (
               <div key={idx} className="flex items-center text-[11px]" data-testid="ai-info-card">
-                <span className="text-cortex-textMuted w-24 shrink-0 font-mono">{c.key}</span>
+                <span className="text-cortex-textMuted w-28 shrink-0 font-mono">{c.key}</span>
                 <span className="text-cortex-textMuted pr-2">:</span>
                 <span className="text-cortex-text truncate font-mono" title={c.value} data-testid="ai-info-card-value">
                   {c.value}
@@ -314,16 +322,15 @@ export const InfoCards: React.FC<{ cards?: Array<{ key: string; value: string }>
           </div>
         </div>
 
-        {/* Hardware (if available) */}
         {hardwareCards.length > 0 && (
           <div>
-            <span className="text-xs font-bold text-cortex-accent tracking-wider block mb-1.5 font-sans">
+            <span className="text-xs font-bold text-sky-300 tracking-wider block mb-1.5 font-sans">
               Hardware
             </span>
             <div className="space-y-0.5 text-[11px]">
               {hardwareCards.map((c, idx) => (
                 <div key={idx} className="flex items-center text-[11px]" data-testid="ai-info-card">
-                  <span className="text-cortex-textMuted w-24 shrink-0 font-mono">{c.key}</span>
+                  <span className="text-cortex-textMuted w-28 shrink-0 font-mono">{c.key}</span>
                   <span className="text-cortex-textMuted pr-2">:</span>
                   <span className="text-cortex-text truncate font-mono" title={c.value} data-testid="ai-info-card-value">
                     {c.value}
@@ -334,16 +341,15 @@ export const InfoCards: React.FC<{ cards?: Array<{ key: string; value: string }>
           </div>
         )}
 
-        {/* Disk Usage (if available) */}
         {diskCards.length > 0 && (
           <div>
-            <span className="text-xs font-bold text-cortex-accent tracking-wider block mb-1.5 font-sans">
+            <span className="text-xs font-bold text-sky-300 tracking-wider block mb-1.5 font-sans">
               Disk Usage
             </span>
             <div className="space-y-0.5 text-[11px]">
               {diskCards.map((c, idx) => (
                 <div key={idx} className="flex items-center text-[11px]" data-testid="ai-info-card">
-                  <span className="text-cortex-textMuted w-24 shrink-0 font-mono">{c.key}</span>
+                  <span className="text-cortex-textMuted w-28 shrink-0 font-mono">{c.key}</span>
                   <span className="text-cortex-textMuted pr-2">:</span>
                   <span className="text-cortex-text truncate font-mono" title={c.value} data-testid="ai-info-card-value">
                     {c.value}
@@ -354,10 +360,9 @@ export const InfoCards: React.FC<{ cards?: Array<{ key: string; value: string }>
           </div>
         )}
 
-        {/* Footer source indicator */}
         <div className="flex items-center gap-1.5 pt-2 border-t border-[#0F222B] text-[10px] text-cortex-textMuted font-mono">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#00F0FF] shadow-[0_0_4px_#00F0FF]" />
-          <span>Sumber: neofetch + df -h + inxi</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-[#38BDF8] shadow-[0_0_4px_#38BDF8]" />
+          <span>AetherCortex Environment Context</span>
         </div>
       </div>
     </div>
@@ -365,11 +370,11 @@ export const InfoCards: React.FC<{ cards?: Array<{ key: string; value: string }>
 };
 
 // ==========================================
-// AetherCortex Avatar (Solid Cyan Box matching reference Image 2)
+// AetherCortex Avatar
 // ==========================================
 
 const AiAvatar: React.FC = () => (
-  <div className="w-8 h-8 rounded-lg bg-[#00F0FF] shrink-0 flex items-center justify-center shadow-[0_0_12px_rgba(0,240,255,0.3)]">
+  <div className="w-8 h-8 rounded-lg bg-sky-500 shrink-0 flex items-center justify-center shadow-[0_0_12px_rgba(56,189,248,0.3)]">
     <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5">
       <ellipse
         cx="50"
@@ -378,25 +383,13 @@ const AiAvatar: React.FC = () => (
         ry="16"
         stroke="#000000"
         strokeWidth="3.5"
-        transform="rotate(-24 50 52)"
-        strokeDasharray="180 30"
-        strokeLinecap="round"
+        strokeDasharray="4 2"
       />
-      <path
-        d="M50 18L26 80H37.5L43 65H57L62.5 80H74L50 18ZM46.5 54.5L50 43.5L53.5 54.5H46.5Z"
-        fill="#000000"
-      />
-      <path
-        d="M74 25L75.5 30L80.5 31.5L75.5 33L74 38L72.5 33L67.5 31.5L72.5 30L74 25Z"
-        fill="#000000"
-      />
+      <circle cx="50" cy="52" r="7" fill="#000000" />
+      <polygon points="50,14 62,38 38,38" fill="#000000" />
     </svg>
   </div>
 );
-
-// ==========================================
-// Message Bubbles matching reference Image 2
-// ==========================================
 
 const UserBubble: React.FC<{ msg: AiMessage }> = ({ msg }) => (
   <div className="flex justify-end" data-testid="ai-message-user">
@@ -406,7 +399,7 @@ const UserBubble: React.FC<{ msg: AiMessage }> = ({ msg }) => (
   </div>
 );
 
-const AssistantBubble: React.FC<{ msg: AiMessage; model: string; onRetry: () => void }> = ({ msg, model, onRetry }) => (
+const AssistantBubble: React.FC<{ msg: AiMessage; model: string; onRetry: () => void }> = ({ msg, onRetry }) => (
   <div className="flex items-start gap-3" data-testid="ai-message-assistant">
     <AiAvatar />
     <div className="flex-1 min-w-0">
@@ -422,7 +415,7 @@ const AssistantBubble: React.FC<{ msg: AiMessage; model: string; onRetry: () => 
             className="self-start flex items-center gap-1 px-2.5 py-1 bg-cortex-surface1 hover:bg-cortex-surface2 border border-cortex-error text-xs font-mono text-cortex-text rounded transition-colors"
             data-testid="ai-retry-button"
           >
-            <RotateCcw className="w-3 h-3 text-cortex-accent" />
+            <RotateCcw className="w-3 h-3 text-sky-400" />
             <span>Retry</span>
           </button>
         </div>
@@ -439,9 +432,9 @@ const AssistantBubble: React.FC<{ msg: AiMessage; model: string; onRetry: () => 
 const SystemBubble: React.FC<{ msg: AiMessage }> = ({ msg }) => (
   <div className="px-3 py-2 bg-cortex-bg border border-cortex-border rounded-lg text-xs font-mono space-y-1.5" data-testid="ai-message-system">
     <div className="flex items-center justify-between text-[10px] text-cortex-textMuted border-b border-cortex-border pb-1">
-      <span className="font-bold text-cortex-accent tracking-wider flex items-center gap-1">
-        <Terminal className="w-3 h-3" />
-        <span>TERMINAL CONTEXT</span>
+      <span className="font-bold text-sky-300 tracking-wider flex items-center gap-1">
+        <Terminal className="w-3 h-3 text-sky-400" />
+        <span>SYSTEM DIRECTIVE</span>
       </span>
       <span className="font-mono">{new Date(msg.timestamp).toLocaleTimeString()}</span>
     </div>
@@ -464,10 +457,47 @@ export const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
   const resolvedOpen = isOpen !== undefined ? isOpen : store.aiAssistantOpen;
 
   const [inputVal, setInputVal] = useState('');
+  const [sessionsDropdownOpen, setSessionsDropdownOpen] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [newTitleVal, setNewTitleVal] = useState('');
+  const [selectedCmdIndex, setSelectedCmdIndex] = useState(0);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const targetPaneId = activePaneId || store.activePaneId || store.panes[0]?.id || 'terminal-1';
+
+  const activeSession: AiSession = useMemo(() => {
+    return (
+      store.aiSessions.find((s) => s.id === store.activeAiSessionId) ||
+      store.aiSessions[0] || {
+        id: 'session_default',
+        title: 'Percakapan Utama',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        provider: store.selectedAiProvider || 'openai',
+        model: store.selectedAiModel || 'gpt-4o',
+        messages: store.aiMessages,
+      }
+    );
+  }, [store.aiSessions, store.activeAiSessionId, store.aiMessages, store.selectedAiProvider, store.selectedAiModel]);
+
+  // Autocomplete suggestions when typing slash commands
+  const filteredCommands: AiCommandDefinition[] = useMemo(() => {
+    const trimmed = inputVal.trim();
+    if (!trimmed.startsWith('/')) return [];
+    const query = trimmed.toLowerCase();
+    return AI_COMMANDS.filter((cmd) => {
+      if (cmd.command.toLowerCase().startsWith(query)) return true;
+      if (cmd.aliases?.some((a) => a.toLowerCase().startsWith(query))) return true;
+      return false;
+    }).slice(0, 6);
+  }, [inputVal]);
+
+  useEffect(() => {
+    setSelectedCmdIndex(0);
+  }, [filteredCommands.length]);
 
   useEffect(() => {
     if (resolvedOpen) {
@@ -481,6 +511,21 @@ export const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
     }
   }, [inputVal]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setSessionsDropdownOpen(false);
+      }
+    };
+    if (sessionsDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [sessionsDropdownOpen]);
 
   const handleClose = () => {
     if (onClose) {
@@ -498,6 +543,26 @@ export const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Navigate command autocomplete if active
+    if (filteredCommands.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedCmdIndex((prev) => (prev + 1) % filteredCommands.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedCmdIndex((prev) => (prev - 1 + filteredCommands.length) % filteredCommands.length);
+        return;
+      }
+      if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey && filteredCommands[selectedCmdIndex])) {
+        e.preventDefault();
+        const selected = filteredCommands[selectedCmdIndex];
+        setInputVal(`${selected.command} `);
+        return;
+      }
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -541,19 +606,18 @@ export const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
       data-testid="ai-assistant-panel"
       aria-label="AI Assistant Panel"
     >
-      {/* Header matching reference mockup */}
+      {/* Top Header */}
       <div className="h-12 px-4 bg-cortex-bg border-b border-cortex-border flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2.5">
-          <Sparkles className="w-4 h-4 text-cortex-accent fill-cortex-accent" />
+          <Sparkles className="w-4 h-4 text-sky-400 fill-sky-400" />
           <span className="font-bold text-sm tracking-tight text-cortex-text" data-testid="ai-panel-title">
             AI Assistant
           </span>
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Subtle provider indicator badge */}
           <span
-            className="text-[10px] font-mono px-2 py-0.5 bg-cortex-surface2 border border-cortex-border text-cortex-accent rounded"
+            className="text-[10px] font-mono px-2 py-0.5 bg-cortex-surface2 border border-cortex-border text-sky-300 rounded"
             data-testid="ai-provider-badge"
             title={`${activeProviderName} / ${store.selectedAiModel}`}
           >
@@ -564,45 +628,173 @@ export const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
             onClick={() => clearAiMessages()}
             className="p-1 text-cortex-textMuted hover:text-cortex-text transition-colors"
             data-testid="ai-clear-history-button"
-            title="Clear conversation"
+            title="Bersihkan pesan sesi ini (/clear)"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
           <button
             type="button"
             onClick={handleClose}
-            className="p-1 text-cortex-textMuted hover:text-cortex-accent transition-colors"
+            className="p-1 text-cortex-textMuted hover:text-sky-300 transition-colors"
             data-testid="ai-panel-close-button"
-            title="Collapse AI Assistant"
+            title="Tutup AI Assistant"
           >
             <ChevronUp className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* Synchronized Selectors (Compact Dark Toolbar) */}
+      {/* Session Management Bar */}
+      <div className="px-3 py-1.5 bg-cortex-surface1 border-b border-cortex-border flex items-center justify-between gap-2 text-xs font-mono relative">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <MessageSquare className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+          {editingTitle ? (
+            <input
+              type="text"
+              value={newTitleVal}
+              onChange={(e) => setNewTitleVal(e.target.value)}
+              onBlur={() => {
+                if (newTitleVal.trim()) {
+                  renameAiSession(activeSession.id, newTitleVal.trim());
+                }
+                setEditingTitle(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  if (newTitleVal.trim()) {
+                    renameAiSession(activeSession.id, newTitleVal.trim());
+                  }
+                  setEditingTitle(false);
+                } else if (e.key === 'Escape') {
+                  setEditingTitle(false);
+                }
+              }}
+              autoFocus
+              className="bg-cortex-bg text-cortex-text text-xs px-1.5 py-0.5 border border-sky-400 rounded outline-none flex-1 min-w-0 font-sans"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setSessionsDropdownOpen((prev) => !prev)}
+              className="flex items-center gap-1 text-cortex-text hover:text-sky-300 truncate transition-colors text-left font-semibold text-xs font-sans"
+              title="Klik untuk memilih atau berpindah sesi"
+            >
+              <span className="truncate">{activeSession.title}</span>
+              <ChevronDown className="w-3 h-3 text-cortex-textMuted shrink-0 ml-0.5" />
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              setNewTitleVal(activeSession.title);
+              setEditingTitle(true);
+            }}
+            className="p-1 text-cortex-textMuted hover:text-sky-300 transition-colors"
+            title="Ganti nama sesi (/session rename)"
+          >
+            <Edit2 className="w-3 h-3" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              createAiSession();
+            }}
+            className="flex items-center gap-1 px-1.5 py-0.5 bg-cortex-surface2 hover:bg-sky-500/10 hover:text-sky-300 text-cortex-text border border-cortex-border rounded transition-colors text-[10px] font-sans"
+            title="Mulai sesi baru (/new)"
+          >
+            <Plus className="w-3 h-3 text-sky-400" />
+            <span>Sesi Baru</span>
+          </button>
+        </div>
+
+        {/* Sessions Dropdown Popup */}
+        {sessionsDropdownOpen && (
+          <div
+            ref={dropdownRef}
+            className="absolute left-2 right-2 top-full mt-1 bg-cortex-bgAlt border border-cortex-borderStrong rounded-lg shadow-2xl z-30 overflow-hidden font-sans max-h-60 flex flex-col"
+          >
+            <div className="px-3 py-1.5 border-b border-cortex-border flex items-center justify-between text-[11px] font-bold text-sky-300 bg-cortex-surface1">
+              <span>Sesi Tersimpan ({store.aiSessions.length})</span>
+              <button
+                type="button"
+                onClick={() => setSessionsDropdownOpen(false)}
+                className="text-cortex-textMuted hover:text-cortex-text p-0.5"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="overflow-y-auto divide-y divide-cortex-border/50">
+              {store.aiSessions.map((s) => {
+                const isCurrent = s.id === activeSession.id;
+                return (
+                  <div
+                    key={s.id}
+                    className={`flex items-center justify-between px-3 py-2 text-xs transition-colors ${
+                      isCurrent
+                        ? 'bg-sky-500/10 text-sky-300 font-medium'
+                        : 'text-cortex-text hover:bg-cortex-surface2'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        switchAiSession(s.id);
+                        setSessionsDropdownOpen(false);
+                      }}
+                      className="flex-1 text-left truncate mr-2"
+                    >
+                      <div className="truncate font-semibold">{s.title}</div>
+                      <div className="text-[10px] text-cortex-textMuted font-mono">
+                        {s.messages.length} pesan • {new Date(s.updatedAt).toLocaleTimeString()}
+                      </div>
+                    </button>
+                    {store.aiSessions.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteAiSession(s.id);
+                        }}
+                        className="p-1 text-cortex-textMuted hover:text-red-400 transition-colors"
+                        title="Hapus sesi ini"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Synchronized Selectors (Compact Toolbar) */}
       <div className="px-3 py-1.5 bg-cortex-bgAlt border-b border-cortex-border flex items-center gap-2 text-[11px]">
         <div className="relative flex-1">
           <select
             data-testid="ai-panel-provider-select"
             value={store.selectedAiProvider}
             onChange={(e) => setSelectedAiProvider(e.target.value)}
-            className="w-full appearance-none bg-[#0B1013] border border-cortex-border text-cortex-text text-[11px] pl-2 pr-6 py-1 font-mono rounded focus:border-cortex-accent focus:outline-none cursor-pointer transition-colors"
-            style={{ backgroundColor: '#0B1013', color: '#F8F9FA' }}
+            className="w-full appearance-none bg-cortex-surface1 border border-cortex-border text-cortex-text text-[11px] pl-2 pr-6 py-1 font-mono rounded focus:border-sky-400 focus:outline-none cursor-pointer transition-colors"
+            style={{ backgroundColor: 'var(--cortex-bg-alt)', color: 'var(--cortex-text)' }}
             title="AI Provider"
           >
             {BUILT_IN_PROVIDERS.map((p) => (
-              <option key={p.id} value={p.id} style={{ backgroundColor: '#0B1013', color: '#F8F9FA' }}>
+              <option key={p.id} value={p.id} style={{ backgroundColor: 'var(--cortex-bg-alt)', color: 'var(--cortex-text)' }}>
                 {p.name}
               </option>
             ))}
             {store.customProviders.map((cp) => (
-              <option key={cp.id} value={cp.id} style={{ backgroundColor: '#0B1013', color: '#F8F9FA' }}>
+              <option key={cp.id} value={cp.id} style={{ backgroundColor: 'var(--cortex-bg-alt)', color: 'var(--cortex-text)' }}>
                 {cp.displayName}
               </option>
             ))}
           </select>
-          <ChevronDown className="w-3 h-3 text-cortex-accent pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" />
+          <ChevronDown className="w-3 h-3 text-sky-400 pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" />
         </div>
 
         <div className="relative flex-1">
@@ -610,27 +802,27 @@ export const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
             data-testid="ai-panel-model-select"
             value={store.selectedAiModel}
             onChange={(e) => setSelectedAiModel(e.target.value)}
-            className="w-full appearance-none bg-[#0B1013] border border-cortex-border text-cortex-text text-[11px] pl-2 pr-6 py-1 font-mono rounded focus:border-cortex-accent focus:outline-none cursor-pointer transition-colors"
-            style={{ backgroundColor: '#0B1013', color: '#F8F9FA' }}
+            className="w-full appearance-none bg-cortex-surface1 border border-cortex-border text-cortex-text text-[11px] pl-2 pr-6 py-1 font-mono rounded focus:border-sky-400 focus:outline-none cursor-pointer transition-colors"
+            style={{ backgroundColor: 'var(--cortex-bg-alt)', color: 'var(--cortex-text)' }}
             title="AI Model"
           >
             {availableModels.map((m) => (
-              <option key={m} value={m} style={{ backgroundColor: '#0B1013', color: '#F8F9FA' }}>
+              <option key={m} value={m} style={{ backgroundColor: 'var(--cortex-bg-alt)', color: 'var(--cortex-text)' }}>
                 {m}
               </option>
             ))}
           </select>
-          <ChevronDown className="w-3 h-3 text-cortex-accent pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" />
+          <ChevronDown className="w-3 h-3 text-sky-400 pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" />
         </div>
 
         <button
           type="button"
           onClick={() => insertTerminalContextToAi(targetPaneId)}
-          className="shrink-0 flex items-center gap-1 px-2 py-1 bg-cortex-surface1 hover:bg-cortex-surface2 text-cortex-textMuted hover:text-cortex-accent text-[10px] font-mono border border-cortex-border rounded transition-colors"
+          className="shrink-0 flex items-center gap-1 px-2 py-1 bg-cortex-surface1 hover:bg-cortex-surface2 text-cortex-textMuted hover:text-sky-300 text-[10px] font-mono border border-cortex-border rounded transition-colors"
           data-testid="ai-add-context-button"
-          title="Attach active terminal session context"
+          title="Lampirkan konteks terminal aktif (/context)"
         >
-          <Terminal className="w-3 h-3 text-cortex-accent" />
+          <Terminal className="w-3 h-3 text-sky-400" />
           <span>+ Context</span>
         </button>
       </div>
@@ -646,16 +838,27 @@ export const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
             <div className="space-y-1.5">
               <span className="font-bold text-sm text-cortex-text block">AetherCortex Assistant</span>
               <p className="text-[13px] text-cortex-textMuted max-w-[260px] leading-relaxed">
-                Tampilkan informasi sistem, generate script shell, atau kirim prompt ke AI.
+                Tampilkan informasi sistem, jalankan command AI (/help), atau kirim prompt ke terminal.
               </p>
             </div>
             <div className="flex flex-col gap-2 w-full max-w-[280px]">
               <button
                 type="button"
                 onClick={() => {
+                  setInputVal('/help');
+                  textareaRef.current?.focus();
+                }}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-cortex-surface1 hover:bg-sky-500/10 text-sky-300 text-xs font-mono border border-cortex-border rounded-lg transition-colors"
+              >
+                <Command className="w-3.5 h-3.5 text-sky-400" />
+                <span>Lihat Command (/help)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
                   setInputVal('tampilkan informasi sistem saya secara lengkap');
                 }}
-                className="w-full text-left px-3 py-2 rounded-lg bg-[#0D151A] border border-[#182631] hover:border-cortex-accent/60 text-xs text-cortex-text transition-colors"
+                className="w-full text-left px-3 py-2 rounded-lg bg-[#0D151A] border border-[#182631] hover:border-sky-400/60 text-xs text-cortex-text transition-colors"
               >
                 &ldquo;tampilkan informasi sistem saya secara lengkap&rdquo;
               </button>
@@ -664,7 +867,7 @@ export const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
                 onClick={() => insertTerminalContextToAi(targetPaneId)}
                 className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-cortex-surface1 hover:bg-cortex-surface2 text-cortex-text text-xs font-mono border border-cortex-border rounded-lg transition-colors"
               >
-                <Terminal className="w-3.5 h-3.5 text-cortex-accent" />
+                <Terminal className="w-3.5 h-3.5 text-sky-400" />
                 <span>Attach Terminal Context</span>
               </button>
             </div>
@@ -688,9 +891,9 @@ export const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
           <div className="flex items-start gap-3" data-testid="ai-loading-indicator">
             <AiAvatar />
             <div className="flex items-center gap-1.5 pt-2.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-cortex-accent animate-bounce" style={{ animationDelay: '0ms' }} />
-              <span className="w-1.5 h-1.5 rounded-full bg-cortex-accent animate-bounce" style={{ animationDelay: '150ms' }} />
-              <span className="w-1.5 h-1.5 rounded-full bg-cortex-accent animate-bounce" style={{ animationDelay: '300ms' }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-bounce" style={{ animationDelay: '300ms' }} />
             </div>
           </div>
         )}
@@ -710,7 +913,7 @@ export const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
               className="self-start flex items-center gap-1.5 px-3 py-1 bg-cortex-surface1 hover:bg-cortex-surface2 border border-cortex-error text-xs font-mono text-cortex-text rounded transition-colors"
               data-testid="ai-retry-button"
             >
-              <RotateCcw className="w-3 h-3 text-cortex-accent" />
+              <RotateCcw className="w-3 h-3 text-sky-400" />
               <span>Retry</span>
             </button>
           </div>
@@ -719,9 +922,39 @@ export const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Bottom Input Box matching reference mockup */}
-      <div className="p-4 bg-cortex-bg border-t border-cortex-border shrink-0 select-text">
-        <div className="relative flex items-center bg-[#050D11] border border-[#00F0FF] rounded-xl px-4 py-3 shadow-[0_0_15px_rgba(0,240,255,0.15)] focus-within:shadow-[0_0_20px_rgba(0,240,255,0.3)] transition-all">
+      {/* Bottom Input Area */}
+      <div className="p-4 bg-cortex-bg border-t border-cortex-border shrink-0 select-text relative">
+        {/* Command Autocomplete Suggestions */}
+        {filteredCommands.length > 0 && (
+          <div className="mb-2 bg-cortex-bgAlt border border-cortex-borderStrong rounded-lg shadow-xl overflow-hidden font-mono text-xs">
+            <div className="px-2.5 py-1 bg-cortex-surface2 border-b border-cortex-border text-[10px] text-sky-300 font-bold uppercase tracking-wider flex items-center justify-between">
+              <span>Saran Command ({filteredCommands.length})</span>
+              <span className="text-cortex-textMuted text-[9px] font-sans">Tekan Tab atau klik untuk memilih</span>
+            </div>
+            <div className="max-h-36 overflow-y-auto">
+              {filteredCommands.map((cmd, idx) => (
+                <button
+                  key={cmd.command}
+                  type="button"
+                  onClick={() => {
+                    setInputVal(`${cmd.command} `);
+                    textareaRef.current?.focus();
+                  }}
+                  className={`w-full text-left px-2.5 py-1.5 flex items-center justify-between hover:bg-sky-500/10 transition-colors ${
+                    idx === selectedCmdIndex ? 'bg-sky-500/15' : ''
+                  }`}
+                >
+                  <span className="text-sky-300 font-bold">{cmd.syntax}</span>
+                  <span className="text-cortex-textMuted text-[10px] font-sans truncate ml-2">
+                    {cmd.description}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="relative flex items-center bg-[#050D11] border border-cortex-border focus-within:border-sky-400 focus-within:shadow-[0_0_15px_rgba(56,189,248,0.2)] rounded-xl px-4 py-3 transition-all">
           <textarea
             ref={textareaRef}
             data-testid="ai-panel-input"
@@ -730,7 +963,7 @@ export const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
             onKeyDown={handleKeyDown}
             disabled={store.aiLoading}
             rows={1}
-            placeholder="Ask Aether..."
+            placeholder="Tanya Aether atau ketik / untuk command..."
             className="flex-1 bg-transparent text-[13px] text-cortex-text placeholder:text-[#7E8F9B] resize-none focus:outline-none font-sans leading-relaxed min-h-[24px] max-h-[120px]"
           />
           <button
@@ -738,10 +971,10 @@ export const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
             onClick={handleSend}
             disabled={!inputVal.trim() || store.aiLoading}
             data-testid="ai-panel-send-button"
-            className="w-8 h-8 rounded-lg bg-[#00F0FF] hover:bg-[#38F4FF] text-black flex items-center justify-center shrink-0 transition-all shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ml-2"
-            title="Send"
+            className="w-8 h-8 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 flex items-center justify-center shrink-0 transition-all shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ml-2"
+            title="Kirim (Enter)"
           >
-            <Send className="w-4 h-4 fill-black stroke-black" />
+            <Send className="w-4 h-4 fill-slate-950 stroke-slate-950" />
           </button>
         </div>
       </div>
