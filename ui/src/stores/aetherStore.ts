@@ -205,6 +205,7 @@ let globalState = {
   pipelineActive: false,
   workflows: [] as AetherWorkflow[],
   workflowsModalOpen: false,
+  commandPaletteOpen: false,
   obsidianRefreshTick: 0,
 };
 
@@ -1035,6 +1036,11 @@ export function toggleOrchestrator(open?: boolean) {
   notify();
 }
 
+export function toggleCommandPalette(open?: boolean) {
+  globalState.commandPaletteOpen = open !== undefined ? open : !globalState.commandPaletteOpen;
+  notify();
+}
+
 export function toggleCustomToolModal(open?: boolean) {
   globalState.customToolModalOpen = open !== undefined ? open : !globalState.customToolModalOpen;
   notify();
@@ -1175,6 +1181,23 @@ export async function resizePanePty(paneId: string, cols: number, rows: number) 
 
 export function setupGlobalShortcuts() {
   const onKeyDown = (e: KeyboardEvent) => {
+    // Ctrl+P or Cmd+P -> Command Palette
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P') && !e.shiftKey && !e.altKey) {
+      e.preventDefault();
+      toggleCommandPalette();
+    }
+    // Cmd+D or Ctrl+D -> Split Vertical; Cmd+Shift+D or Ctrl+Shift+D -> Split Horizontal
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D') && !e.altKey) {
+      e.preventDefault();
+      splitActivePane(e.shiftKey ? 'horizontal' : 'vertical');
+    }
+    // Escape -> Close open modals
+    if (e.key === 'Escape') {
+      if (globalState.commandPaletteOpen) {
+        e.preventDefault();
+        toggleCommandPalette(false);
+      }
+    }
     // Ctrl+Space -> Orchestrator Bar
     if (e.ctrlKey && e.code === 'Space') {
       e.preventDefault();

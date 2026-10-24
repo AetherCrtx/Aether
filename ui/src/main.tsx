@@ -17,6 +17,7 @@ import {
   toggleTimeTravel,
   toggleObsidianSidebar,
   toggleBackgroundDrawer,
+  toggleCommandPalette,
   AGENT_PALETTES,
   setDefaultShell,
   toggleCustomToolModal,
@@ -34,6 +35,7 @@ import { CustomToolModal } from './components/CustomToolModal';
 import { ConfirmCloseModal } from './components/ConfirmCloseModal';
 import { BackgroundTasksDrawer } from './components/BackgroundTasksDrawer';
 import { WorkflowsModal } from './components/WorkflowsModal';
+import { CommandPaletteModal } from './components/CommandPaletteModal';
 
 import {
   Terminal,
@@ -49,6 +51,7 @@ import {
   ChevronDown,
   SlidersHorizontal,
   X,
+  Search,
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -156,6 +159,19 @@ const App: React.FC = () => {
 
         {/* Global Action Toolbar */}
         <div className="flex items-center space-x-1 sm:space-x-1.5 shrink-0">
+          {/* Command Palette Button */}
+          <button
+            onClick={() => toggleCommandPalette()}
+            className="flex items-center space-x-1.5 px-2 py-1 rounded text-[11px] bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700/60 transition-colors"
+            title="Command Palette (Ctrl+P / Cmd+P)"
+          >
+            <Search className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="hidden md:inline">Palette</span>
+            <kbd className="hidden lg:inline text-[9px] bg-slate-900 text-slate-400 px-1 py-0.2 rounded border border-slate-800">
+              Ctrl+P
+            </kbd>
+          </button>
+
           {/* Background Tasks Drawer Button */}
           <button
             onClick={() => toggleBackgroundDrawer()}
@@ -432,16 +448,19 @@ const App: React.FC = () => {
         {/* Right: Keybinding cheat-sheet */}
         <div className="hidden sm:flex items-center space-x-2 text-slate-400">
           <span>
+            <kbd className="text-cyan-300 bg-slate-800 px-1 py-0.5 rounded border border-slate-700">Ctrl+P</kbd> Palette
+          </span>
+          <span>
             <kbd className="text-slate-300 bg-slate-800 px-1 py-0.5 rounded">Ctrl+T</kbd> Tab
           </span>
           <span>
             <kbd className="text-slate-300 bg-slate-800 px-1 py-0.5 rounded">Ctrl+W</kbd> Close
           </span>
           <span>
-            <kbd className="text-slate-300 bg-slate-800 px-1 py-0.5 rounded">Alt+H/J/K/L</kbd> Nav
+            <kbd className="text-slate-300 bg-slate-800 px-1 py-0.5 rounded">Cmd+D</kbd> Split
           </span>
           <span>
-            <kbd className="text-slate-300 bg-slate-800 px-1 py-0.5 rounded">Alt+Shift+H/L</kbd> Resize
+            <kbd className="text-slate-300 bg-slate-800 px-1 py-0.5 rounded">Alt+H/J/K/L</kbd> Nav
           </span>
           <span>
             <kbd className="text-slate-300 bg-slate-800 px-1 py-0.5 rounded">Alt+E</kbd> Balance
@@ -456,6 +475,7 @@ const App: React.FC = () => {
       </footer>
 
       {/* ================= MODALS & DRAWERS ================= */}
+      <CommandPaletteModal />
       <OrchestratorBar />
       <DiffGatekeeperModal />
       <TimeTravelSlider />
