@@ -1519,9 +1519,11 @@ export function subscribeAetherEvents(onPtyData?: (paneId: string, bytes: Uint8A
         onPtyData(pane_id, bytes, offset);
       }
       // Attribute output to the pane's active command block (Warp Block View).
-      // Decode only when a block is actually open: decoding + ANSI-stripping every
-      // chunk is the dominant cost on high-throughput output (cargo build, tail -f).
-      if (getOpenCommandBlock(pane_id)) {
+      // Decode only when the pane is in 'blocks' view mode and a block is actually open:
+      // decoding + ANSI-stripping every chunk is extremely expensive during interactive TUIs (agy, opencode)
+      // and causes unnecessary main-thread locks and React re-renders when in normal terminal mode.
+      const targetPane = globalState.panes.find((p) => p.id === pane_id);
+      if (targetPane && targetPane.viewMode === 'blocks' && getOpenCommandBlock(pane_id)) {
         try {
           const decoded = new TextDecoder().decode(new Uint8Array(data));
           appendBlockOutput(pane_id, stripAnsi(decoded));

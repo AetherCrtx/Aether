@@ -353,10 +353,13 @@ impl PtyManager {
         // Avoid leaking outer terminal identifiers so tools know this is an xterm terminal
         cmd_builder.env_remove("KITTY_WINDOW_ID");
         cmd_builder.env_remove("KITTY_PID");
+        cmd_builder.env_remove("VSCODE_INJECTION");
 
         // Set proper terminal identification
         cmd_builder.env("TERM", "xterm-256color");
         cmd_builder.env("COLORTERM", "truecolor");
+        cmd_builder.env("TERM_PROGRAM", "AetherTerminal");
+        cmd_builder.env("TERM_PROGRAM_VERSION", "0.2.0");
 
         // Ensure ~/.local/bin and ~/.local/lib are discoverable
         let home = std::env::var("HOME").unwrap_or_else(|_| "/home/rasshqa".to_string());
