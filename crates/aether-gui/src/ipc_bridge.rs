@@ -192,7 +192,7 @@ pub async fn process_event_stream<F>(
 ) where
     F: FnMut(&str, IpcEvent),
 {
-    let mut pane_buffers: HashMap<String, Vec<u8>> = HashMap::new();
+    let mut pane_buffers: HashMap<String, (u64, Vec<u8>)> = HashMap::new();
     let start = tokio::time::Instant::now() + std::time::Duration::from_millis(flush_interval_ms);
     let mut flush_interval = tokio::time::interval_at(start, std::time::Duration::from_millis(flush_interval_ms));
     flush_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -200,11 +200,12 @@ pub async fn process_event_stream<F>(
     loop {
         tokio::select! {
             _ = flush_interval.tick() => {
-                for (pane_id, buf) in pane_buffers.iter_mut() {
+                for (pane_id, (start_offset, buf)) in pane_buffers.iter_mut() {
                     if !buf.is_empty() {
                         let event = IpcEvent::PtyOutput {
                             pane_id: pane_id.clone(),
                             data: std::mem::take(buf),
+                            offset: *start_offset,
                         };
                         emit_fn("aether:event", event);
                     }
@@ -212,19 +213,25 @@ pub async fn process_event_stream<F>(
             }
             msg_opt = event_rx.recv() => {
                 match msg_opt {
-                    Some(IpcMessage::Event(IpcEvent::PtyOutput { pane_id, data })) => {
-                        let buf = pane_buffers.entry(pane_id.clone()).or_default();
-                        buf.extend(data);
+                    Some(IpcMessage::Event(IpcEvent::PtyOutput { pane_id, data, offset })) => {
+                        let entry = pane_buffers.entry(pane_id.clone()).or_insert_with(|| (offset, Vec::new()));
+                        if entry.1.is_empty() {
+                            entry.0 = offset;
+                        }
+                        entry.1.extend(data);
 
                         // Adaptive draining: drain queued PTY output only. A non-PTY event
                         // (PaneExited, status change) stops the drain so the main select
                         // branch handles it and keeps event ordering intact.
                         while let Ok(next_msg) = event_rx.try_recv() {
                             match next_msg {
-                                IpcMessage::Event(IpcEvent::PtyOutput { pane_id: next_id, data: next_data }) => {
-                                    let b = pane_buffers.entry(next_id).or_default();
-                                    b.extend(next_data);
-                                    if b.len() >= chunk_threshold {
+                                IpcMessage::Event(IpcEvent::PtyOutput { pane_id: next_id, data: next_data, offset: next_offset }) => {
+                                    let b = pane_buffers.entry(next_id).or_insert_with(|| (next_offset, Vec::new()));
+                                    if b.1.is_empty() {
+                                        b.0 = next_offset;
+                                    }
+                                    b.1.extend(next_data);
+                                    if b.1.len() >= chunk_threshold {
                                         break;
                                     }
                                 }
@@ -232,11 +239,12 @@ pub async fn process_event_stream<F>(
                                     // Re-inject by handling inline: flush first, then emit.
                                     if let IpcMessage::Event(ref ev) = other {
                                         if let IpcEvent::PaneExited { ref pane_id, .. } = ev {
-                                            if let Some(buf) = pane_buffers.get_mut(pane_id) {
+                                            if let Some((start_offset, buf)) = pane_buffers.get_mut(pane_id) {
                                                 if !buf.is_empty() {
                                                     let pty_event = IpcEvent::PtyOutput {
                                                         pane_id: pane_id.clone(),
                                                         data: std::mem::take(buf),
+                                                        offset: *start_offset,
                                                     };
                                                     emit_fn("aether:event", pty_event);
                                                 }
@@ -252,11 +260,12 @@ pub async fn process_event_stream<F>(
                         // Contract (see tests): a buffer is flushed only when it reaches
                         // the chunk threshold, when its pane exits, or when the interval
                         // timer fires. Draining never flushes on its own.
-                        for (pid, p_buf) in pane_buffers.iter_mut() {
+                        for (pid, (start_offset, p_buf)) in pane_buffers.iter_mut() {
                             if p_buf.len() >= chunk_threshold {
                                 let event = IpcEvent::PtyOutput {
                                     pane_id: pid.clone(),
                                     data: std::mem::take(p_buf),
+                                    offset: *start_offset,
                                 };
                                 emit_fn("aether:event", event);
                             }
@@ -265,11 +274,12 @@ pub async fn process_event_stream<F>(
                     Some(IpcMessage::Event(event)) => {
                         // If a pane exited, flush any pending PTY output for that pane first
                         if let IpcEvent::PaneExited { ref pane_id, .. } = event {
-                            if let Some(buf) = pane_buffers.get_mut(pane_id) {
+                            if let Some((start_offset, buf)) = pane_buffers.get_mut(pane_id) {
                                 if !buf.is_empty() {
                                     let pty_event = IpcEvent::PtyOutput {
                                         pane_id: pane_id.clone(),
                                         data: std::mem::take(buf),
+                                        offset: *start_offset,
                                     };
                                     emit_fn("aether:event", pty_event);
                                 }
@@ -280,9 +290,9 @@ pub async fn process_event_stream<F>(
                     Some(_) => {}
                     None => {
                         // Channel closed: flush all remaining buffers
-                        for (pane_id, buf) in pane_buffers.drain() {
+                        for (pane_id, (start_offset, buf)) in pane_buffers.drain() {
                             if !buf.is_empty() {
-                                let event = IpcEvent::PtyOutput { pane_id, data: buf };
+                                let event = IpcEvent::PtyOutput { pane_id, data: buf, offset: start_offset };
                                 emit_fn("aether:event", event);
                             }
                         }
@@ -414,14 +424,22 @@ pub fn cmd_check_pane_process(pid: u32, cli_type: String) -> Option<String> {
     None
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ScrollbackResponse {
+    pub data: Vec<u8>,
+    pub end_offset: u64,
+}
+
 #[tauri::command]
 pub async fn cmd_get_scrollback(
     state: State<'_, GuiBridgeState>,
     pane_id: String,
-) -> Result<Vec<u8>, String> {
+) -> Result<ScrollbackResponse, String> {
     let req = IpcRequestPayload::GetScrollback { pane_id };
     match state.send_request(req).await? {
-        IpcResponsePayload::ScrollbackData { data, .. } => Ok(data),
+        IpcResponsePayload::ScrollbackData { data, end_offset, .. } => {
+            Ok(ScrollbackResponse { data, end_offset })
+        }
         _ => Err("Unexpected response".to_string()),
     }
 }
@@ -719,6 +737,7 @@ mod tests {
         tx.send(IpcMessage::Event(IpcEvent::PtyOutput {
             pane_id: "pane_1".to_string(),
             data: vec![b'A'; 600],
+            offset: 0,
         }))
         .await
         .unwrap();
@@ -732,6 +751,7 @@ mod tests {
         tx.send(IpcMessage::Event(IpcEvent::PtyOutput {
             pane_id: "pane_1".to_string(),
             data: vec![b'B'; 600],
+            offset: 600,
         }))
         .await
         .unwrap();
@@ -739,8 +759,9 @@ mod tests {
         sleep(Duration::from_millis(15)).await;
         let lock = emitted.lock().unwrap();
         assert_eq!(lock.len(), 1);
-        if let IpcEvent::PtyOutput { pane_id, data } = &lock[0] {
+        if let IpcEvent::PtyOutput { pane_id, data, offset } = &lock[0] {
             assert_eq!(pane_id, "pane_1");
+            assert_eq!(*offset, 0);
             assert_eq!(data.len(), 1200);
             assert_eq!(&data[..600], vec![b'A'; 600].as_slice());
             assert_eq!(&data[600..], vec![b'B'; 600].as_slice());
@@ -775,6 +796,7 @@ mod tests {
         tx.send(IpcMessage::Event(IpcEvent::PtyOutput {
             pane_id: "pane_2".to_string(),
             data: b"hello interval".to_vec(),
+            offset: 0,
         }))
         .await
         .unwrap();
@@ -787,8 +809,9 @@ mod tests {
         sleep(Duration::from_millis(30)).await;
         let lock = emitted.lock().unwrap();
         assert_eq!(lock.len(), 1);
-        if let IpcEvent::PtyOutput { pane_id, data } = &lock[0] {
+        if let IpcEvent::PtyOutput { pane_id, data, offset } = &lock[0] {
             assert_eq!(pane_id, "pane_2");
+            assert_eq!(*offset, 0);
             assert_eq!(data.as_slice(), b"hello interval");
         } else {
             panic!("Expected PtyOutput event");
@@ -821,6 +844,7 @@ mod tests {
         tx.send(IpcMessage::Event(IpcEvent::PtyOutput {
             pane_id: "pane_3".to_string(),
             data: b"final output".to_vec(),
+            offset: 0,
         }))
         .await
         .unwrap();
@@ -839,8 +863,9 @@ mod tests {
         assert_eq!(lock.len(), 2);
         // First event must be the flushed PtyOutput
         match &lock[0] {
-            IpcEvent::PtyOutput { pane_id, data } => {
+            IpcEvent::PtyOutput { pane_id, data, offset } => {
                 assert_eq!(pane_id, "pane_3");
+                assert_eq!(*offset, 0);
                 assert_eq!(data.as_slice(), b"final output");
             }
             other => panic!("Expected PtyOutput, got {:?}", other),

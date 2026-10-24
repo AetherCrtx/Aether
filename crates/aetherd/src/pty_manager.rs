@@ -156,6 +156,7 @@ pub struct PaneSession {
     ring_buffer: Arc<std::sync::Mutex<VecDeque<u8>>>,
     line_buffer: Arc<std::sync::Mutex<String>>,
     active: Arc<AtomicBool>,
+    total_bytes: Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl PaneSession {
@@ -213,17 +214,18 @@ impl PaneSession {
         Ok(())
     }
 
-    /// Get current scrollback buffer from memory
-    pub fn get_scrollback(&self) -> Result<Vec<u8>, PtyError> {
+    /// Get current scrollback buffer from memory along with the end byte offset
+    pub fn get_scrollback(&self) -> Result<(Vec<u8>, u64), PtyError> {
         let buf = self
             .ring_buffer
             .lock()
             .map_err(|_| PtyError::LockPoisoned)?;
+        let end_offset = self.total_bytes.load(Ordering::SeqCst);
         let (first, second) = buf.as_slices();
         let mut res = Vec::with_capacity(first.len() + second.len());
         res.extend_from_slice(first);
         res.extend_from_slice(second);
-        Ok(res)
+        Ok((res, end_offset))
     }
 
     /// Is the process currently running
@@ -356,6 +358,7 @@ impl PtyManager {
         )));
         let line_buffer = Arc::new(std::sync::Mutex::new(String::new()));
         let active = Arc::new(AtomicBool::new(true));
+        let total_bytes = Arc::new(std::sync::atomic::AtomicU64::new(0));
 
         let session = Arc::new(PaneSession {
             pane_id: pane_id.clone(),
@@ -365,6 +368,7 @@ impl PtyManager {
             ring_buffer: ring_buffer.clone(),
             line_buffer: line_buffer.clone(),
             active: active.clone(),
+            total_bytes: total_bytes.clone(),
         });
 
         // Register session
@@ -377,6 +381,7 @@ impl PtyManager {
         let reader_pane_id = pane_id.clone();
         let reader_event_tx = self.event_tx.clone();
         let reader_active = active.clone();
+        let reader_total_bytes = total_bytes.clone();
 
         std::thread::Builder::new()
             .name(format!("pty-read-{reader_pane_id}"))
@@ -390,6 +395,7 @@ impl PtyManager {
                         }
                         Ok(n) => {
                             let bytes = &buf[..n];
+                            let offset = reader_total_bytes.fetch_add(n as u64, Ordering::SeqCst);
 
                             // 1. Update ring buffer
                             if let Ok(mut rb) = ring_buffer.lock() {
@@ -407,6 +413,7 @@ impl PtyManager {
                             let event = IpcEvent::PtyOutput {
                                 pane_id: reader_pane_id.clone(),
                                 data: bytes.to_vec(),
+                                offset,
                             };
                             let _ = reader_event_tx.send(event);
                         }
@@ -544,8 +551,8 @@ impl PtyManager {
         Ok(())
     }
 
-    /// Retrieve scrollback buffer for pane
-    pub async fn get_scrollback(&self, pane_id: &str) -> Result<Vec<u8>, PtyError> {
+    /// Retrieve scrollback buffer and end offset for pane
+    pub async fn get_scrollback(&self, pane_id: &str) -> Result<(Vec<u8>, u64), PtyError> {
         let session = {
             let lock = self.sessions.read().await;
             lock.get(pane_id)
@@ -783,7 +790,7 @@ mod tests {
             tokio::select! {
                 Ok(event) = rx.recv() => {
                     match event {
-                        IpcEvent::PtyOutput { pane_id: id, data } if id == pane_id => {
+                        IpcEvent::PtyOutput { pane_id: id, data, .. } if id == pane_id => {
                             collected.extend_from_slice(&data);
                             let text = String::from_utf8_lossy(&collected);
                             if text.contains("Hello from Aether") {
@@ -808,6 +815,10 @@ mod tests {
             "Expected output to contain 'Hello from Aether', got: {}",
             output_str
         );
+
+        let (scrollback, end_offset) = manager.get_scrollback(&pane_id).await?;
+        assert!(end_offset > 0, "end_offset should be > 0");
+        assert!(!scrollback.is_empty(), "scrollback should not be empty");
 
         Ok(())
     }

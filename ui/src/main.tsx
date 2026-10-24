@@ -56,18 +56,18 @@ const App: React.FC = () => {
   const [spawnMenuOpen, setSpawnMenuOpen] = useState(false);
 
   // Map of paneId -> termWriter function
-  const termWritersRef = useRef<Map<string, (data: Uint8Array | string) => void>>(new Map());
+  const termWritersRef = useRef<Map<string, (data: Uint8Array | string, offset?: number) => void>>(new Map());
   // Pending PTY chunks arriving before the terminal component mounts and registers its writer
-  const pendingPtyBuffersRef = useRef<Map<string, Uint8Array[]>>(new Map());
+  const pendingPtyBuffersRef = useRef<Map<string, { bytes: Uint8Array; offset: number }[]>>(new Map());
 
   const registerTermWriter = useCallback(
-    (paneId: string, writer: (data: Uint8Array | string) => void) => {
+    (paneId: string, writer: (data: Uint8Array | string, offset?: number) => void) => {
       termWritersRef.current.set(paneId, writer);
       // Flush any pending bytes that arrived while component was mounting
       const pending = pendingPtyBuffersRef.current.get(paneId);
       if (pending && pending.length > 0) {
         for (const chunk of pending) {
-          writer(chunk);
+          writer(chunk.bytes, chunk.offset);
         }
         pendingPtyBuffersRef.current.delete(paneId);
       }
@@ -84,10 +84,10 @@ const App: React.FC = () => {
     const cleanupShortcuts = setupGlobalShortcuts();
 
     // 2. Subscribe to background events from aetherd (PTY outputs, status, ports, blackboard)
-    const cleanupEvents = subscribeAetherEvents((paneId, bytes) => {
+    const cleanupEvents = subscribeAetherEvents((paneId, bytes, offset = 0) => {
       const writer = termWritersRef.current.get(paneId);
       if (writer) {
-        writer(bytes);
+        writer(bytes, offset);
       } else {
         // Buffer bytes until the pane mounts and registers its writer!
         let buf = pendingPtyBuffersRef.current.get(paneId);
@@ -95,7 +95,7 @@ const App: React.FC = () => {
           buf = [];
           pendingPtyBuffersRef.current.set(paneId, buf);
         }
-        buf.push(bytes);
+        buf.push({ bytes, offset });
       }
     });
 

@@ -209,32 +209,64 @@ export const XtermWebGLPane: React.FC<Props> = ({
     };
 
     let disposed = false;
-    // Live bytes arriving while scrollback is still in flight must wait, otherwise the
-    // snapshot is appended after them and the same lines render twice.
+    let lastWrittenOffset = 0;
     let scrollbackRestored = false;
-    const preRestoreQueue: (Uint8Array | string)[] = [];
+    const preRestoreQueue: { data: Uint8Array | string; offset: number }[] = [];
 
     // Register writer so incoming aetherd PTY events write to this terminal via RAF queue
-    const unregister = registerTermWriter(paneId, (data) => {
-      if (!scrollbackRestored) {
-        preRestoreQueue.push(data);
+    const unregister = registerTermWriter(paneId, (data: Uint8Array | string, offset: number = 0) => {
+      if (typeof data === 'string') {
+        chunkQueue.push(data);
+        scheduleFlush();
         return;
       }
+      if (!scrollbackRestored) {
+        preRestoreQueue.push({ data, offset });
+        return;
+      }
+      // Deduplicate: if live bytes are already covered by scrollback or previous write, discard them
+      if (offset + data.length <= lastWrittenOffset) {
+        return;
+      }
+      if (offset < lastWrittenOffset) {
+        const slice = data.subarray(lastWrittenOffset - offset);
+        lastWrittenOffset += slice.length;
+        chunkQueue.push(slice);
+        scheduleFlush();
+        return;
+      }
+      lastWrittenOffset = offset + data.length;
       chunkQueue.push(data);
       scheduleFlush();
     });
 
     // 5. Restore scrollback history (512 KB ring buffer in aetherd) before live output
-    getPaneScrollback(paneId).then((bytes) => {
+    getPaneScrollback(paneId).then((res) => {
       if (disposed) return;
-      if (bytes && bytes.length > 0) {
-        term.write(bytes);
+      if (res && res.data && res.data.length > 0) {
+        term.write(res.data);
+        lastWrittenOffset = res.endOffset;
       }
     }).catch(() => {}).finally(() => {
       if (disposed) return;
       scrollbackRestored = true;
-      for (const chunk of preRestoreQueue) {
-        chunkQueue.push(chunk);
+      for (const item of preRestoreQueue) {
+        if (typeof item.data === 'string') {
+          chunkQueue.push(item.data);
+          continue;
+        }
+        if (item.offset + item.data.length <= lastWrittenOffset) {
+          // Chunk is already included in the scrollback buffer snapshot! Discard to prevent double render.
+          continue;
+        }
+        if (item.offset < lastWrittenOffset) {
+          const slice = item.data.subarray(lastWrittenOffset - item.offset);
+          lastWrittenOffset += slice.length;
+          chunkQueue.push(slice);
+        } else {
+          lastWrittenOffset = item.offset + item.data.length;
+          chunkQueue.push(item.data);
+        }
       }
       preRestoreQueue.length = 0;
       if (chunkQueue.length > 0) {

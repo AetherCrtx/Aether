@@ -1319,7 +1319,7 @@ export function setupGlobalShortcuts() {
   return () => window.removeEventListener('keydown', onKeyDown);
 }
 
-export function subscribeAetherEvents(onPtyData?: (paneId: string, bytes: Uint8Array) => void) {
+export function subscribeAetherEvents(onPtyData?: (paneId: string, bytes: Uint8Array, offset?: number) => void) {
   if (!listen) return () => {};
 
   let unlistenPromise = listen('aether:event', (event: any) => {
@@ -1327,9 +1327,10 @@ export function subscribeAetherEvents(onPtyData?: (paneId: string, bytes: Uint8A
     if (!payload) return;
 
     if (payload.PtyOutput) {
-      const { pane_id, data } = payload.PtyOutput;
+      const { pane_id, data, offset = 0 } = payload.PtyOutput;
+      const bytes = new Uint8Array(data);
       if (onPtyData) {
-        onPtyData(pane_id, new Uint8Array(data));
+        onPtyData(pane_id, bytes, offset);
       }
       // Attribute output to the pane's active command block (Warp Block View).
       // Decode only when a block is actually open: decoding + ANSI-stripping every
@@ -1614,11 +1615,19 @@ export function stripAnsi(input: string): string {
   return input.replace(ANSI_PATTERN, '');
 }
 
-export async function getPaneScrollback(paneId: string): Promise<Uint8Array | null> {
+export interface ScrollbackDataResult {
+  data: Uint8Array;
+  endOffset: number;
+}
+
+export async function getPaneScrollback(paneId: string): Promise<ScrollbackDataResult | null> {
   if (!isRunningInTauri()) return null;
   try {
-    const bytes = await invoke('cmd_get_scrollback', { paneId });
-    return bytes && bytes.length > 0 ? new Uint8Array(bytes) : null;
+    const res = (await invoke('cmd_get_scrollback', { paneId })) as { data: number[] | Uint8Array; end_offset?: number } | null;
+    if (!res || !res.data) return null;
+    const data = Array.isArray(res.data) ? new Uint8Array(res.data) : (res.data instanceof Uint8Array ? res.data : new Uint8Array(res.data));
+    const endOffset = typeof res.end_offset === 'number' ? res.end_offset : data.length;
+    return { data, endOffset };
   } catch (e) {
     console.warn('getPaneScrollback failed:', e);
     return null;

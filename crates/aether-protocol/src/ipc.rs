@@ -292,7 +292,12 @@ pub enum IpcResponsePayload {
     PaneKilled { pane_id: String },
     PaneList(Vec<PaneSummary>),
     PaneStatus(AgentStatus),
-    ScrollbackData { pane_id: String, data: Vec<u8> },
+    ScrollbackData {
+        pane_id: String,
+        data: Vec<u8>,
+        #[serde(default)]
+        end_offset: u64,
+    },
     Workspace(WorkspaceInfo),
     SharedContext(SharedContextSummary),
     BlackboardPublished { entry_id: i64 },
@@ -375,6 +380,8 @@ pub enum IpcEvent {
     PtyOutput {
         pane_id: String,
         data: Vec<u8>,
+        #[serde(default)]
+        offset: u64,
     },
     /// Child process exited
     PaneExited {

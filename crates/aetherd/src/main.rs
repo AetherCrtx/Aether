@@ -569,9 +569,9 @@ async fn process_request(ctx: &DaemonContext, req: IpcRequest) -> IpcResponse {
 
         IpcRequestPayload::GetScrollback { pane_id } => {
             match ctx.pty_manager.get_scrollback(&pane_id).await {
-                Ok(data) => IpcResponse::ok(
+                Ok((data, end_offset)) => IpcResponse::ok(
                     req_id,
-                    IpcResponsePayload::ScrollbackData { pane_id, data },
+                    IpcResponsePayload::ScrollbackData { pane_id, data, end_offset },
                 ),
                 Err(e) => IpcResponse::err(req_id, "PTY_SCROLLBACK_FAILED", e.to_string()),
             }
