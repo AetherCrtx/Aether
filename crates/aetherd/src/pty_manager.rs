@@ -116,6 +116,37 @@ fn resolve_shell_command(cmd_opt: Option<&str>) -> String {
     }
 }
 
+/// Injects SSH keepalive and resilience flags if not already present.
+/// Flags: -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o TCPKeepAlive=yes
+pub fn inject_ssh_keepalive_args(args: &mut Vec<String>) {
+    let has_alive_interval = args.iter().any(|a| a.contains("ServerAliveInterval"));
+    let has_alive_count = args.iter().any(|a| a.contains("ServerAliveCountMax"));
+    let has_tcp_keepalive = args.iter().any(|a| a.contains("TCPKeepAlive"));
+
+    let mut to_insert = Vec::new();
+    if !has_alive_interval {
+        to_insert.push("-o".to_string());
+        to_insert.push("ServerAliveInterval=15".to_string());
+    }
+    if !has_alive_count {
+        to_insert.push("-o".to_string());
+        to_insert.push("ServerAliveCountMax=3".to_string());
+    }
+    if !has_tcp_keepalive {
+        to_insert.push("-o".to_string());
+        to_insert.push("TCPKeepAlive=yes".to_string());
+    }
+
+    if !to_insert.is_empty() {
+        args.splice(0..0, to_insert);
+    }
+}
+
+pub fn is_ssh_command(cmd: &str) -> bool {
+    let lower = cmd.to_lowercase();
+    lower == "ssh" || lower.ends_with("/ssh")
+}
+
 /// Resolve the executable plus argument vector for a spawn request.
 ///
 /// A raw command string such as "npm run dev" or "echo hello && uname -a" arrives as a
@@ -130,7 +161,12 @@ fn resolve_exec_and_args(command: Option<&str>, args: Vec<String>) -> (String, V
 
     // Explicit args mean the caller already separated the binary from its flags.
     if !args.is_empty() {
-        return (resolve_shell_command(Some(&raw)), args);
+        let exe = resolve_shell_command(Some(&raw));
+        let mut final_args = args;
+        if is_ssh_command(&exe) {
+            inject_ssh_keepalive_args(&mut final_args);
+        }
+        return (exe, final_args);
     }
 
     if has_shell_operators(&raw) {
@@ -140,12 +176,22 @@ fn resolve_exec_and_args(command: Option<&str>, args: Vec<String>) -> (String, V
 
     let tokens = split_command_tokens(&raw);
     if tokens.len() <= 1 {
-        return (resolve_shell_command(Some(&raw)), args);
+        let exe = resolve_shell_command(Some(&raw));
+        let mut final_args = args;
+        if is_ssh_command(&exe) {
+            inject_ssh_keepalive_args(&mut final_args);
+        }
+        return (exe, final_args);
     }
 
     let exe = resolve_shell_command(Some(&tokens[0]));
-    (exe, tokens[1..].to_vec())
+    let mut final_args = tokens[1..].to_vec();
+    if is_ssh_command(&exe) {
+        inject_ssh_keepalive_args(&mut final_args);
+    }
+    (exe, final_args)
 }
+
 
 /// Active session representing a single pseudo-terminal child process
 pub struct PaneSession {
@@ -273,6 +319,9 @@ impl PtyManager {
 
         // Determine executable command
         let (exec_cmd, mut final_args) = resolve_exec_and_args(command.as_deref(), args);
+        if is_ssh_command(&exec_cmd) {
+            inject_ssh_keepalive_args(&mut final_args);
+        }
         // If spawning an interactive shell with no arguments, pass login/interactive flags
         // so user profile, fastfetch, and completions load properly
         if final_args.is_empty() {
@@ -431,16 +480,12 @@ impl PtyManager {
         let watcher_pane_id = pane_id.clone();
         let watcher_event_tx = self.event_tx.clone();
         let watcher_active = active.clone();
-        let watcher_sessions = self.sessions.clone();
 
         std::thread::Builder::new()
             .name(format!("pty-wait-{watcher_pane_id}"))
             .spawn(move || {
                 let status = child.wait();
                 watcher_active.store(false, Ordering::SeqCst);
-                if let Ok(mut lock) = watcher_sessions.try_write() {
-                    lock.remove(&watcher_pane_id);
-                }
 
                 let exit_code = match status {
                     Ok(st) => {
@@ -856,4 +901,82 @@ mod tests {
 
         assert_eq!(ports_vec, vec![3000, 8080]);
     }
+
+    #[test]
+    fn test_ssh_keepalive_args_injection() {
+        let mut args = vec!["user@example.com".to_string()];
+        inject_ssh_keepalive_args(&mut args);
+        assert_eq!(
+            args,
+            vec![
+                "-o",
+                "ServerAliveInterval=15",
+                "-o",
+                "ServerAliveCountMax=3",
+                "-o",
+                "TCPKeepAlive=yes",
+                "user@example.com"
+            ]
+        );
+    }
+
+    #[test]
+    fn test_ssh_keepalive_args_idempotent() {
+        let mut args = vec!["user@example.com".to_string()];
+        inject_ssh_keepalive_args(&mut args);
+        let len_after_first = args.len();
+        inject_ssh_keepalive_args(&mut args);
+        assert_eq!(args.len(), len_after_first);
+    }
+
+    #[test]
+    fn test_ssh_keepalive_preserves_custom_flags() {
+        let mut args = vec![
+            "-o".to_string(),
+            "ServerAliveInterval=60".to_string(),
+            "user@example.com".to_string(),
+        ];
+        inject_ssh_keepalive_args(&mut args);
+        assert!(args.contains(&"ServerAliveInterval=60".to_string()));
+        assert!(!args.contains(&"ServerAliveInterval=15".to_string()));
+        assert!(args.contains(&"ServerAliveCountMax=3".to_string()));
+        assert!(args.contains(&"TCPKeepAlive=yes".to_string()));
+    }
+
+    #[test]
+    fn test_resolve_exec_and_args_injects_ssh_keepalive() {
+        let (exe, args) = resolve_exec_and_args(Some("ssh user@host.internal"), Vec::new());
+        assert!(exe.ends_with("ssh") || exe == "ssh");
+        assert_eq!(
+            args,
+            vec![
+                "-o",
+                "ServerAliveInterval=15",
+                "-o",
+                "ServerAliveCountMax=3",
+                "-o",
+                "TCPKeepAlive=yes",
+                "user@host.internal"
+            ]
+        );
+    }
+
+    #[test]
+    fn test_resolve_exec_and_args_ssh_explicit_args() {
+        let (exe, args) = resolve_exec_and_args(Some("ssh"), vec!["dev@server".to_string()]);
+        assert!(exe.ends_with("ssh") || exe == "ssh");
+        assert_eq!(
+            args,
+            vec![
+                "-o",
+                "ServerAliveInterval=15",
+                "-o",
+                "ServerAliveCountMax=3",
+                "-o",
+                "TCPKeepAlive=yes",
+                "dev@server"
+            ]
+        );
+    }
 }
+

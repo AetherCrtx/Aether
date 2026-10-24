@@ -5,6 +5,7 @@ import {
   recentCommandsFor,
   sendPtyInput,
   dispatchToPeerAgent,
+  routePromptToAgent,
 } from '../stores/aetherStore';
 import {
   CornerDownLeft,
@@ -18,6 +19,7 @@ import {
   ArrowRight,
   Code2,
 } from 'lucide-react';
+import { classifyCommand, type ClassificationResult } from '../utils/commandClassifier';
 
 interface Props {
   paneId: string;
@@ -54,12 +56,29 @@ export const ModernInputBar: React.FC<Props> = ({ paneId, cliType, isAgentPane, 
   const store = useAetherStore();
   const [value, setValue] = useState('');
   const [historyIndex, setHistoryIndex] = useState(-1);
+  const [manualModeOverride, setManualModeOverride] = useState<InputMode | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const pane = store.panes.find((p) => p.id === paneId);
   const history = useMemo(() => recentCommandsFor(paneId, 30), [paneId, value]);
 
-  const mode: InputMode = value.startsWith('#') ? 'ai' : 'cmd';
+  const detectedToolNames = useMemo(
+    () => store.detectedTools.map((t) => t.binary.toLowerCase()),
+    [store.detectedTools]
+  );
+
+  const classification: ClassificationResult = useMemo(() => {
+    return classifyCommand(value, detectedToolNames);
+  }, [value, detectedToolNames]);
+
+  // Dynamic mode resolution: explicit prefix takes top priority, then manual pin, then classifier
+  const mode: InputMode = useMemo(() => {
+    const trimmed = value.trim();
+    if (trimmed.startsWith('#')) return 'ai';
+    if (trimmed.startsWith('$ ') || trimmed === '$') return 'cmd';
+    if (manualModeOverride !== null) return manualModeOverride;
+    return classification.suggestedMode;
+  }, [value, manualModeOverride, classification.suggestedMode]);
 
   useEffect(() => {
     textareaRef.current?.focus();
@@ -68,7 +87,7 @@ export const ModernInputBar: React.FC<Props> = ({ paneId, cliType, isAgentPane, 
   // Smart Autocomplete: Match history first, then fallback to common CLI commands
   const suggestion = useMemo(() => {
     if (!value.trim() || historyIndex !== -1) return '';
-    if (value.startsWith('#')) return ''; // AI mode does not autosuggest shell commands
+    if (mode === 'ai') return ''; // AI mode does not autosuggest shell commands
 
     // 1. Check history
     const historyMatch = history.find((h) => h.toLowerCase().startsWith(value.toLowerCase()) && h !== value);
@@ -85,36 +104,41 @@ export const ModernInputBar: React.FC<Props> = ({ paneId, cliType, isAgentPane, 
     }
 
     return '';
-  }, [value, history, historyIndex]);
+  }, [value, history, historyIndex, mode]);
 
   const toggleMode = () => {
-    if (mode === 'cmd') {
-      setValue('# ' + value.trim());
-    } else {
-      setValue(value.replace(/^#\s*/, ''));
-    }
+    const nextMode: InputMode = mode === 'cmd' ? 'ai' : 'cmd';
+    setManualModeOverride(nextMode);
   };
 
   const submit = async () => {
     const trimmed = value.trim();
     if (!trimmed) return;
 
-    if (trimmed.startsWith('#')) {
-      // AI mode: natural language goes to the agent CLI (or a peer agent pane for shells)
-      const instruction = trimmed.slice(1).trim();
-      if (!instruction) return;
+    if (mode === 'ai') {
+      // AI mode: natural language prompt to agent pipeline
+      const cleanInstruction = trimmed.replace(/^#\s*/, '').trim();
+      if (!cleanInstruction) return;
+
       if (isAgentPane) {
-        await sendPtyInput(paneId, `${instruction}\n`);
+        // If active pane is an agent pane, send instruction directly without prepending '#'
+        await sendPtyInput(paneId, `${cleanInstruction}\n`);
       } else {
-        await dispatchToPeerAgent(`# ${instruction}`, '', undefined);
+        // If active pane is a regular shell pane, route to agent pane without shell errors
+        await routePromptToAgent(cleanInstruction, paneId);
       }
     } else {
-      await executeCommandInPane(paneId, trimmed);
+      // CMD mode: execute shell command (strip '$ ' prefix if typed explicitly)
+      const cleanCmd = trimmed.replace(/^\$\s*/, '').trim();
+      if (!cleanCmd) return;
+      await executeCommandInPane(paneId, cleanCmd);
     }
 
     setValue('');
     setHistoryIndex(-1);
+    setManualModeOverride(null);
   };
+
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -240,19 +264,31 @@ export const ModernInputBar: React.FC<Props> = ({ paneId, cliType, isAgentPane, 
         <button
           type="button"
           onClick={toggleMode}
-          className={`mt-1 shrink-0 flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono border transition-all cursor-pointer ${
+          className={`mt-1 shrink-0 flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono border transition-all cursor-pointer ${
             mode === 'ai'
               ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/50 hover:bg-indigo-500/30 shadow-sm'
               : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50 hover:bg-cyan-500/30'
           }`}
-          title={
-            mode === 'ai'
-              ? 'AI Mode active (click to switch to CMD mode)'
-              : 'Shell Mode active (click or type # to switch to AI mode)'
-          }
+          title={`Mode: ${mode === 'ai' ? 'AI Agent' : 'Shell Command'}${manualModeOverride !== null ? ' (Pinned)' : ' (Auto-detected)'}\nAuto-detection: ${classification.reason} (${Math.round(classification.confidence * 100)}% confidence)\nClick to toggle mode`}
         >
-          {mode === 'ai' ? <Hash className="w-3 h-3" /> : <Terminal className="w-3 h-3" />}
-          <span>{mode === 'ai' ? '# AI' : '$ CMD'}</span>
+          {mode === 'ai' ? (
+            <Sparkles className="w-3 h-3 text-indigo-400" />
+          ) : (
+            <Terminal className="w-3 h-3 text-cyan-400" />
+          )}
+          <span>
+            {mode === 'ai'
+              ? value.trim().startsWith('#')
+                ? '# AI'
+                : manualModeOverride === 'ai'
+                ? '✨ AI (Pinned)'
+                : '✨ AI (Auto)'
+              : value.trim().startsWith('$')
+              ? '$ CMD'
+              : manualModeOverride === 'cmd'
+              ? '$ CMD (Pinned)'
+              : '$ CMD'}
+          </span>
         </button>
 
         <div className="relative flex-1">
@@ -267,7 +303,9 @@ export const ModernInputBar: React.FC<Props> = ({ paneId, cliType, isAgentPane, 
             onKeyDown={onKeyDown}
             placeholder={
               mode === 'ai'
-                ? 'Ask agent AI or instruct next action... (Shift+Enter for newline)'
+                ? isAgentPane
+                  ? 'Instruct active AI agent... (Shift+Enter for newline)'
+                  : 'Ask AI or natural language prompt (auto-routes to agent)...'
                 : `Run command in @${cliType}... (Tab / Right Arrow for autocomplete)`
             }
             className="w-full resize-none bg-slate-950/90 border border-slate-700/80 rounded px-2.5 py-1 text-[11px] font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500/80 max-h-24 shadow-inner"
@@ -298,10 +336,11 @@ export const ModernInputBar: React.FC<Props> = ({ paneId, cliType, isAgentPane, 
           <span>·</span>
           <span>Tab/→ autocomplete</span>
           <span>·</span>
-          <span># for AI</span>
+          <span>Auto-detects AI/Shell</span>
           <span>·</span>
           <span>Esc close</span>
         </div>
+
         <span>{history.length} in history</span>
       </div>
     </div>

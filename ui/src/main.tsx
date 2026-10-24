@@ -19,6 +19,7 @@ import {
   toggleBackgroundDrawer,
   toggleCommandPalette,
   toggleThemeModal,
+  toggleAetherDriveSidebar,
   AGENT_PALETTES,
   setDefaultShell,
   toggleCustomToolModal,
@@ -28,6 +29,7 @@ import {
 
 import { TerminalGrid } from './components/TerminalGrid';
 import { ChromeHeaderTabs } from './components/ChromeHeaderTabs';
+import { AetherDriveSidebar } from './components/AetherDriveSidebar';
 import { OrchestratorBar } from './components/OrchestratorBar';
 import { DiffGatekeeperModal } from './components/DiffGatekeeperModal';
 import { TimeTravelSlider } from './components/TimeTravelSlider';
@@ -55,6 +57,7 @@ import {
   X,
   Search,
   Palette,
+  FolderTree,
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -130,6 +133,24 @@ const App: React.FC = () => {
             AETHER<span className="text-cyan-400 font-light">//TERM</span>
           </span>
         </div>
+
+        {/* Aether Drive Sidebar Toggle Button */}
+        <button
+          onClick={() => toggleAetherDriveSidebar()}
+          className={`flex items-center space-x-1.5 px-2 py-1 rounded text-[11px] border transition-colors shrink-0 ${
+            store.aetherDriveSidebarOpen
+              ? 'bg-cyan-950/70 border-cyan-500/60 text-cyan-200 shadow-sm shadow-cyan-500/20'
+              : 'bg-slate-800/80 hover:bg-slate-800 text-slate-300 border-slate-700/60'
+          }`}
+          title="Aether Drive Workspace Sidebar (Cmd+\ / Ctrl+\)"
+          data-testid="btn-toggle-drive-sidebar"
+        >
+          <FolderTree className="w-3.5 h-3.5 text-cyan-400" />
+          <span className="hidden md:inline font-semibold">Drive</span>
+          <kbd className="hidden lg:inline text-[9px] bg-slate-900 text-slate-400 px-1 py-0.2 rounded border border-slate-800">
+            Ctrl+\
+          </kbd>
+        </button>
 
         {/* Chrome-Style Tabs & '+' Button directly in Header */}
         <ChromeHeaderTabs />
@@ -431,8 +452,11 @@ const App: React.FC = () => {
       </header>
 
       {/* ================= MAIN TERMINAL AREA ================= */}
-      <main className="flex-1 w-full relative overflow-hidden bg-slate-950">
-        <TerminalGrid registerTermWriter={registerTermWriter} />
+      <main className="flex-1 w-full relative overflow-hidden bg-slate-950 flex flex-row">
+        <AetherDriveSidebar />
+        <div className="flex-1 h-full relative overflow-hidden min-w-0">
+          <TerminalGrid registerTermWriter={registerTermWriter} />
+        </div>
       </main>
 
       {/* ================= BOTTOM STATUS FOOTER ================= */}

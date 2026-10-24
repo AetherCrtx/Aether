@@ -10,7 +10,9 @@ use ipc_bridge::{
     cmd_list_workflows,
     cmd_merge_worktree, cmd_publish_blackboard, cmd_read_obsidian_note, cmd_release_module,
     cmd_resize_pane, cmd_rollback_snapshot, cmd_send_pty_input, cmd_spawn_pane,
-    cmd_update_obsidian_task, cmd_validate_tool, start_event_listener, GuiBridgeState,
+    cmd_update_obsidian_task, cmd_validate_tool,
+    cmd_read_workspace_directory, cmd_search_workspace_files, cmd_read_workspace_file,
+    start_event_listener, GuiBridgeState,
 };
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
@@ -60,7 +62,10 @@ fn main() {
             cmd_list_workflows,
             cmd_update_obsidian_task,
             cmd_detect_available_tools,
-            cmd_validate_tool
+            cmd_validate_tool,
+            cmd_read_workspace_directory,
+            cmd_search_workspace_files,
+            cmd_read_workspace_file
         ])
         .build(tauri::generate_context!())
         .expect("error while building AetherTerminal application")
