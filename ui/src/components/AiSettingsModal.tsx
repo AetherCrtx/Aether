@@ -187,6 +187,26 @@ export const AiSettingsModal: React.FC = () => {
           return;
         }
 
+        // Mandatory Pre-Save Connection Verification
+        setTesting(true);
+        const testRes = await testProviderConnection('custom', {
+          api_key: apiKey.trim(),
+          model: model.trim(),
+          base_url: baseUrl.trim(),
+          display_name: displayName.trim(),
+          protocol,
+        });
+        setTesting(false);
+        setTestResult(testRes);
+
+        if (!testRes.success) {
+          setValidationError(
+            `Koneksi gagal: ${testRes.message}. Pastikan Endpoint Base URL, API Key, dan Model sudah benar sebelum menyimpan.`
+          );
+          setSaving(false);
+          return;
+        }
+
         const newId = await addCustomProvider({
           displayName: displayName.trim(),
           baseUrl: baseUrl.trim(),
@@ -221,6 +241,26 @@ export const AiSettingsModal: React.FC = () => {
         }
         if (!model.trim()) {
           setValidationError('Model Identifier is required.');
+          setSaving(false);
+          return;
+        }
+
+        // Mandatory Pre-Save Connection Verification
+        setTesting(true);
+        const testRes = await testProviderConnection(selectedId, {
+          api_key: apiKey.trim(),
+          model: model.trim(),
+          base_url: baseUrl.trim(),
+          display_name: displayName.trim(),
+          protocol,
+        });
+        setTesting(false);
+        setTestResult(testRes);
+
+        if (!testRes.success) {
+          setValidationError(
+            `Koneksi gagal: ${testRes.message}. Pastikan Endpoint Base URL, API Key, dan Model sudah benar sebelum menyimpan.`
+          );
           setSaving(false);
           return;
         }

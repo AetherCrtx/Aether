@@ -101,7 +101,7 @@ describe('Milestone 1: Brand Identity, Design Tokens & Persistent Sidebar Unit T
       assert.equal(darkTheme.bg, '#0B1013');
       assert.equal(darkTheme.panel, '#0E1418');
       assert.equal(darkTheme.border, '#162026');
-      assert.equal(darkTheme.fg, '#F8F9FA');
+      assert.equal(darkTheme.fg, '#93C5FD');
 
       // Verify Light Mode palette tokens with high-contrast cyan
       assert.equal(lightTheme.accent, '#00A3AD');
@@ -109,7 +109,7 @@ describe('Milestone 1: Brand Identity, Design Tokens & Persistent Sidebar Unit T
       assert.equal(lightTheme.bg, '#F8F9FA');
       assert.equal(lightTheme.panel, '#F1F4F6');
       assert.equal(lightTheme.border, '#CBD5E1');
-      assert.equal(lightTheme.fg, '#050809');
+      assert.equal(lightTheme.fg, '#1E3A8A');
     });
 
     it('applyTheme updates CSS variables and persists selection to localStorage', () => {

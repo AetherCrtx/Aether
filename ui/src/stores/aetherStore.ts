@@ -2785,7 +2785,11 @@ export async function testProviderConnection(
       });
       return { success: true, message: result };
     } catch (err: any) {
-      return { success: false, message: String(err?.message || err) };
+      let raw = String(err?.message || err);
+      if (raw.includes('Connection closed by peer') || raw.includes('connection closed')) {
+        raw = `Connection closed by peer: Endpoint di '${baseUrl || provider}' memutus koneksi. Pastikan URL endpoint (contoh: https://openrouter.ai/api/v1), API key, dan model valid.`;
+      }
+      return { success: false, message: raw };
     }
   }
 

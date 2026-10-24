@@ -37,37 +37,47 @@ export const ThemeModal: React.FC = () => {
     setTerminalOpacity(val);
   };
 
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'light' | 'dark'>('all');
+
+  const filteredThemes = AETHER_THEMES.filter((t) => {
+    const isLight =
+      t.id.includes('light') || t.id.includes('latte') || t.id.includes('day');
+    if (categoryFilter === 'light') return isLight;
+    if (categoryFilter === 'dark') return !isLight;
+    return true;
+  });
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/75 backdrop-blur-sm animate-fadeIn select-none"
       onClick={() => toggleThemeModal(false)}
     >
       <div
-        className="w-full max-w-2xl bg-slate-900 border border-slate-700/80 rounded-xl shadow-2xl flex flex-col overflow-hidden animate-scaleUp"
+        className="w-full max-w-2xl bg-cortex-bgAlt border border-cortex-border rounded-xl shadow-2xl flex flex-col overflow-hidden animate-scaleUp"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="h-14 px-6 flex items-center justify-between border-b border-slate-800 bg-slate-950/60">
+        <div className="h-14 px-6 flex items-center justify-between border-b border-cortex-border bg-cortex-bg/80">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
+            <div className="p-2 rounded-lg bg-cortex-accentMuted border border-cortex-accent/30 text-cortex-accent">
               <Palette className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-sm font-bold text-white flex items-center gap-2">
+              <div className="text-sm font-bold text-cortex-text flex items-center gap-2">
                 <span>Theming & Appearance Engine</span>
-                <kbd className="text-[10px] bg-slate-800 text-cyan-300 px-1.5 py-0.5 rounded border border-slate-700">
+                <kbd className="text-[10px] bg-cortex-surface2 text-cortex-accent px-1.5 py-0.5 rounded border border-cortex-border">
                   Cmd+,
                 </kbd>
               </div>
-              <div className="text-xs text-slate-400 mt-0.5">
-                Customize Warp terminal aesthetics, colors, and Wayland compositor opacity
+              <div className="text-xs text-cortex-textMuted mt-0.5">
+                Customize Aether terminal aesthetics, light & dark themes, and opacity
               </div>
             </div>
           </div>
 
           <button
             onClick={() => toggleThemeModal(false)}
-            className="p-1.5 text-slate-400 hover:text-white rounded transition-colors"
+            className="p-1.5 text-cortex-textMuted hover:text-cortex-text rounded transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -75,15 +85,53 @@ export const ThemeModal: React.FC = () => {
 
         {/* Body */}
         <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh]">
-          {/* Theme Presets */}
+          {/* Theme Presets with Category Filter */}
           <div>
-            <div className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-3 flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-cyan-400" />
-              <span>Theme Presets</span>
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-xs font-semibold text-cortex-text uppercase tracking-wider flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-cortex-accent" />
+                <span>Theme Presets</span>
+              </div>
+
+              {/* Filter Pills */}
+              <div className="flex items-center gap-1 bg-cortex-surface1 p-0.5 border border-cortex-border rounded text-[11px]">
+                <button
+                  onClick={() => setCategoryFilter('all')}
+                  className={`px-2.5 py-0.5 rounded transition-colors ${
+                    categoryFilter === 'all'
+                      ? 'bg-cortex-surface2 text-cortex-accent font-bold'
+                      : 'text-cortex-textMuted hover:text-cortex-text'
+                  }`}
+                >
+                  Semua
+                </button>
+                <button
+                  onClick={() => setCategoryFilter('light')}
+                  className={`px-2.5 py-0.5 rounded transition-colors flex items-center gap-1 ${
+                    categoryFilter === 'light'
+                      ? 'bg-cortex-surface2 text-cortex-accent font-bold'
+                      : 'text-cortex-textMuted hover:text-cortex-text'
+                  }`}
+                >
+                  <SunMedium className="w-3 h-3" />
+                  <span>Tema Terang</span>
+                </button>
+                <button
+                  onClick={() => setCategoryFilter('dark')}
+                  className={`px-2.5 py-0.5 rounded transition-colors flex items-center gap-1 ${
+                    categoryFilter === 'dark'
+                      ? 'bg-cortex-surface2 text-cortex-accent font-bold'
+                      : 'text-cortex-textMuted hover:text-cortex-text'
+                  }`}
+                >
+                  <Moon className="w-3 h-3" />
+                  <span>Tema Gelap</span>
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {AETHER_THEMES.map((theme) => {
+              {filteredThemes.map((theme) => {
                 const isSelected = selectedThemeId === theme.id;
                 return (
                   <div
@@ -91,14 +139,14 @@ export const ThemeModal: React.FC = () => {
                     onClick={() => handleSelectTheme(theme)}
                     className={`p-3.5 rounded-lg border cursor-pointer transition-all flex flex-col justify-between ${
                       isSelected
-                        ? 'border-cyan-400 bg-slate-800/90 shadow-lg shadow-cyan-950/50'
-                        : 'border-slate-800 bg-slate-950/50 hover:border-slate-700 hover:bg-slate-800/40'
+                        ? 'border-cortex-accent bg-cortex-surface2 shadow-lg shadow-cortex-accent/20'
+                        : 'border-cortex-border bg-cortex-surface1 hover:border-cortex-borderStrong hover:bg-cortex-surface2'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <span className="font-semibold text-xs text-white">{theme.name}</span>
+                      <span className="font-semibold text-xs text-cortex-text">{theme.name}</span>
                       {isSelected ? (
-                        <span className="p-0.5 rounded-full bg-cyan-400 text-slate-950">
+                        <span className="p-0.5 rounded-full bg-cortex-accent text-black">
                           <Check className="w-3.5 h-3.5 stroke-[3]" />
                         </span>
                       ) : (
@@ -109,7 +157,7 @@ export const ThemeModal: React.FC = () => {
                       )}
                     </div>
 
-                    <p className="text-[11px] text-slate-400 mb-3">{theme.description}</p>
+                    <p className="text-[11px] text-cortex-textMuted mb-3">{theme.description}</p>
 
                     {/* Color Swatches */}
                     <div className="flex items-center gap-1.5">
@@ -146,17 +194,17 @@ export const ThemeModal: React.FC = () => {
           </div>
 
           {/* Opacity & Compositing */}
-          <div className="border-t border-slate-800 pt-5">
-            <div className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2 flex items-center justify-between">
+          <div className="border-t border-cortex-border pt-5">
+            <div className="text-xs font-semibold text-cortex-text uppercase tracking-wider mb-2 flex items-center justify-between">
               <span className="flex items-center gap-2">
-                <Sliders className="w-4 h-4 text-cyan-400" />
+                <Sliders className="w-4 h-4 text-cortex-accent" />
                 <span>Window Background Opacity</span>
               </span>
-              <span className="text-cyan-400 font-mono text-xs">
+              <span className="text-cortex-accent font-mono text-xs">
                 {Math.round(opacity * 100)}%
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 mb-3">
+            <p className="text-[11px] text-cortex-textMuted mb-3">
               Adjust window transparency for Hyprland / Sway blur compositing.
             </p>
             <input
@@ -166,22 +214,22 @@ export const ThemeModal: React.FC = () => {
               step="0.05"
               value={opacity}
               onChange={(e) => handleOpacityChange(parseFloat(e.target.value))}
-              className="w-full accent-cyan-400 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer"
+              className="w-full accent-[#00F0FF] h-1.5 bg-cortex-surface2 rounded-lg appearance-none cursor-pointer"
             />
           </div>
 
           {/* Terminal Rendering Engine */}
-          <div className="border-t border-slate-800 pt-5">
-            <div className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2 flex items-center justify-between">
+          <div className="border-t border-cortex-border pt-5">
+            <div className="text-xs font-semibold text-cortex-text uppercase tracking-wider mb-2 flex items-center justify-between">
               <span className="flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-cyan-400" />
+                <Cpu className="w-4 h-4 text-cortex-accent" />
                 <span>Terminal Rendering Engine</span>
               </span>
-              <span className="text-cyan-400 font-mono text-[11px] uppercase">
+              <span className="text-cortex-accent font-mono text-[11px] uppercase">
                 {terminalRenderer}
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 mb-3">
+            <p className="text-[11px] text-cortex-textMuted mb-3">
               Choose the terminal rendering backend. On Linux with Wayland or hybrid graphics, Native DOM provides 0ms input latency and zero CPU rasterization overhead.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -195,24 +243,24 @@ export const ThemeModal: React.FC = () => {
                   onClick={() => handleRendererChange(opt.id)}
                   className={`p-2.5 rounded-lg border text-left transition-all ${
                     terminalRenderer === opt.id
-                      ? 'border-cyan-400 bg-cyan-950/30 text-white shadow-sm shadow-cyan-950/50'
-                      : 'border-slate-800 bg-slate-950/40 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                      ? 'border-cortex-accent bg-cortex-surface2 text-cortex-text shadow-sm shadow-cortex-accent/20'
+                      : 'border-cortex-border bg-cortex-surface1 text-cortex-textMuted hover:border-cortex-borderStrong hover:text-cortex-text'
                   }`}
                 >
                   <div className="text-xs font-semibold flex items-center justify-between">
                     <span>{opt.label}</span>
-                    {terminalRenderer === opt.id && <Check className="w-3.5 h-3.5 text-cyan-400" />}
+                    {terminalRenderer === opt.id && <Check className="w-3.5 h-3.5 text-cortex-accent" />}
                   </div>
-                  <div className="text-[10px] text-slate-500 mt-1">{opt.desc}</div>
+                  <div className="text-[10px] text-cortex-textMuted/80 mt-1">{opt.desc}</div>
                 </button>
               ))}
             </div>
           </div>
 
           {/* Live Mini Preview */}
-          <div className="border-t border-slate-800 pt-5">
-            <div className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-3 flex items-center gap-2">
-              <Monitor className="w-4 h-4 text-cyan-400" />
+          <div className="border-t border-cortex-border pt-5">
+            <div className="text-xs font-semibold text-cortex-text uppercase tracking-wider mb-3 flex items-center gap-2">
+              <Monitor className="w-4 h-4 text-cortex-accent" />
               <span>Live Terminal Palette Preview</span>
             </div>
 
@@ -241,13 +289,13 @@ export const ThemeModal: React.FC = () => {
         </div>
 
         {/* Footer */}
-        <div className="h-14 px-6 border-t border-slate-800 bg-slate-950/60 flex items-center justify-between">
-          <span className="text-[11px] text-slate-500">
+        <div className="h-14 px-6 border-t border-cortex-border bg-cortex-bg/80 flex items-center justify-between">
+          <span className="text-[11px] text-cortex-textMuted">
             Settings automatically persist in your local profile.
           </span>
           <button
             onClick={() => toggleThemeModal(false)}
-            className="px-4 py-1.5 rounded-md bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium transition-colors"
+            className="px-4 py-1.5 rounded-md bg-cortex-accent hover:bg-cortex-accentHover text-black text-xs font-bold transition-colors"
           >
             Done
           </button>

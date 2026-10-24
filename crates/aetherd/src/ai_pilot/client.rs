@@ -94,7 +94,10 @@ pub struct AiPilotClient {
 impl AiPilotClient {
     pub fn new() -> Self {
         let http = reqwest::Client::builder()
+            .user_agent("AetherTerminal/0.1.0 (X11; Linux x86_64)")
             .timeout(Duration::from_secs(60))
+            .pool_idle_timeout(Some(Duration::from_secs(30)))
+            .tcp_keepalive(Some(Duration::from_secs(30)))
             .build()
             .unwrap_or_else(|_| reqwest::Client::new());
         Self { http }
@@ -144,7 +147,10 @@ impl AiPilotClient {
                     .base_url
                     .as_deref()
                     .unwrap_or("https://api.openai.com/v1");
-                self.call_openai_compat(settings, messages, tools, default_url, false)
+                let is_router = default_url.contains("openrouter")
+                    || default_url.contains("9router")
+                    || default_url.contains("router");
+                self.call_openai_compat(settings, messages, tools, default_url, is_router)
                     .await
             }
         }
@@ -171,15 +177,24 @@ impl AiPilotClient {
         default_base_url: &str,
         is_openrouter: bool,
     ) -> Result<ChatResponse, String> {
-        let base_url = settings
+        let raw_base = settings
             .base_url
             .as_deref()
             .unwrap_or(default_base_url)
-            .trim_end_matches('/');
-        let url = format!("{base_url}/chat/completions");
+            .trim();
+        let trimmed = raw_base.trim_end_matches('/');
+        let url = if trimmed.ends_with("/chat/completions") {
+            trimmed.to_string()
+        } else {
+            format!("{trimmed}/chat/completions")
+        };
 
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        headers.insert(
+            reqwest::header::ACCEPT,
+            HeaderValue::from_static("application/json"),
+        );
 
         if !settings.api_key.trim().is_empty() {
             let auth_val = format!("Bearer {}", settings.api_key.trim());
@@ -188,7 +203,12 @@ impl AiPilotClient {
             }
         }
 
-        if is_openrouter {
+        let is_router_endpoint = is_openrouter
+            || url.contains("openrouter")
+            || url.contains("9router")
+            || url.contains("router");
+
+        if is_router_endpoint {
             headers.insert("HTTP-Referer", HeaderValue::from_static("https://aetherterminal.dev"));
             headers.insert("X-Title", HeaderValue::from_static("AetherTerminal"));
         }
@@ -197,6 +217,7 @@ impl AiPilotClient {
             "model": settings.model,
             "messages": messages,
             "temperature": 0.2,
+            "max_tokens": 1000,
         });
 
         if !tools.is_empty() {
@@ -206,56 +227,99 @@ impl AiPilotClient {
 
         debug!("Dispatching request to {url} with model {}", settings.model);
 
-        let res = self
-            .http
-            .post(&url)
-            .headers(headers)
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| format!("HTTP request error to {url}: {e}"))?;
+        // Attempt request with single retry on transient socket reset / connection closed by peer
+        let mut last_error = String::new();
+        for attempt in 0..2 {
+            if attempt > 0 {
+                tokio::time::sleep(Duration::from_millis(150)).await;
+            }
 
-        let status = res.status();
-        let resp_text = res
-            .text()
-            .await
-            .map_err(|e| format!("Failed to read response body: {e}"))?;
+            match self
+                .http
+                .post(&url)
+                .headers(headers.clone())
+                .json(&body)
+                .send()
+                .await
+            {
+                Ok(res) => {
+                    let status = res.status();
+                    let resp_text = res
+                        .text()
+                        .await
+                        .map_err(|e| format!("Failed to read response body: {e}"))?;
 
-        if !status.is_success() {
-            return Err(format!("Provider returned status {status}: {resp_text}"));
-        }
+                    if !status.is_success() {
+                        return Err(format!("Provider returned status {status}: {resp_text}"));
+                    }
 
-        let val: serde_json::Value = serde_json::from_str(&resp_text)
-            .map_err(|e| format!("Failed to parse JSON response: {e}. Raw: {resp_text}"))?;
+                    let val: serde_json::Value = serde_json::from_str(&resp_text).map_err(|e| {
+                        format!("Failed to parse JSON response: {e}. Raw: {resp_text}")
+                    })?;
 
-        let choice = val
-            .get("choices")
-            .and_then(|c| c.as_array())
-            .and_then(|arr| arr.first())
-            .ok_or_else(|| format!("Invalid response format, missing choices: {resp_text}"))?;
+                    let choice = val
+                        .get("choices")
+                        .and_then(|c| c.as_array())
+                        .and_then(|arr| arr.first())
+                        .ok_or_else(|| {
+                            format!("Invalid response format, missing choices: {resp_text}")
+                        })?;
 
-        let message = choice.get("message").ok_or("Missing message in choice")?;
+                    let message = choice.get("message").ok_or("Missing message in choice")?;
+                    let content = message
+                        .get("content")
+                        .and_then(|c| c.as_str())
+                        .map(|s| s.to_string());
 
-        let content = message.get("content").and_then(|c| c.as_str()).map(|s| s.to_string());
+                    let mut tool_calls = Vec::new();
+                    if let Some(tcs) = message.get("tool_calls").and_then(|t| t.as_array()) {
+                        for tc in tcs {
+                            let id = tc.get("id").and_then(|i| i.as_str()).unwrap_or("").to_string();
+                            let r#type = tc
+                                .get("type")
+                                .and_then(|t| t.as_str())
+                                .unwrap_or("function")
+                                .to_string();
+                            if let Some(fn_obj) = tc.get("function") {
+                                let name =
+                                    fn_obj.get("name").and_then(|n| n.as_str()).unwrap_or("").to_string();
+                                let args = fn_obj
+                                    .get("arguments")
+                                    .and_then(|a| a.as_str())
+                                    .unwrap_or("{}")
+                                    .to_string();
+                                tool_calls.push(ToolCall {
+                                    id,
+                                    r#type,
+                                    function: FunctionCall {
+                                        name,
+                                        arguments: args,
+                                    },
+                                });
+                            }
+                        }
+                    }
 
-        let mut tool_calls = Vec::new();
-        if let Some(tcs) = message.get("tool_calls").and_then(|t| t.as_array()) {
-            for tc in tcs {
-                let id = tc.get("id").and_then(|i| i.as_str()).unwrap_or("").to_string();
-                let r#type = tc.get("type").and_then(|t| t.as_str()).unwrap_or("function").to_string();
-                if let Some(fn_obj) = tc.get("function") {
-                    let name = fn_obj.get("name").and_then(|n| n.as_str()).unwrap_or("").to_string();
-                    let args = fn_obj.get("arguments").and_then(|a| a.as_str()).unwrap_or("{}").to_string();
-                    tool_calls.push(ToolCall {
-                        id,
-                        r#type,
-                        function: FunctionCall { name, arguments: args },
-                    });
+                    return Ok(ChatResponse { content, tool_calls });
+                }
+                Err(e) => {
+                    let err_str = e.to_string();
+                    let is_peer_closed = err_str.contains("connection closed")
+                        || err_str.contains("closed before message completed")
+                        || err_str.contains("reset by peer");
+
+                    if is_peer_closed {
+                        last_error = format!(
+                            "Connection closed by peer at {url}. The remote endpoint closed the connection. Check that the endpoint URL is reachable, the API key is valid, and the model exists on this provider."
+                        );
+                    } else {
+                        last_error = format!("HTTP request error to {url}: {err_str}");
+                    }
                 }
             }
         }
 
-        Ok(ChatResponse { content, tool_calls })
+        Err(last_error)
     }
 
     /// Handles Gemini OpenAI compatibility endpoint

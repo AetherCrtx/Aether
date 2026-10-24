@@ -4,15 +4,15 @@
 
 :root,
 :root.dark-mode {
-  /* Dark Mode Tokens - Harmonious Cosmic Cyan Void */
+  /* Dark Mode Tokens - Harmonious Cosmic Cyan Void with Blue Typography */
   --cortex-bg: #050809;             /* Deep void near-black primary background */
   --cortex-bg-alt: #0B1013;         /* Sidebar / charcoal secondary background */
   --cortex-surface-1: #0E1418;      /* Dark panel surface */
   --cortex-surface-2: #121A1F;      /* Hover state / secondary surface */
   --cortex-border: #162026;         /* Thin crisp border */
   --cortex-border-strong: #1E2B33;  /* High-contrast divider */
-  --cortex-text: #F8F9FA;           /* Off-white primary text */
-  --cortex-text-muted: #7E8F9B;     /* Muted gray secondary text */
+  --cortex-text: #93C5FD;           /* Crisp Sky Blue primary text (WCAG AAA >= 11:1) */
+  --cortex-text-muted: #7096BD;     /* Muted slate blue secondary text (WCAG AA >= 4.5:1) */
   --cortex-accent: #00F0FF;         /* Cosmic Cyan accent */
   --cortex-accent-hover: #38F4FF;   /* Accent hover */
   --cortex-accent-muted: rgba(0, 240, 255, 0.12);
@@ -38,16 +38,17 @@
 }
 
 :root.light-mode {
-  --cortex-bg: #FFFFFF;
-  --cortex-bg-alt: #F8F9FA;
-  --cortex-surface-1: #F1F4F6;
-  --cortex-surface-2: #E5E9EC;
-  --cortex-border: #CBD5E1;
-  --cortex-border-strong: #94A3B8;
-  --cortex-text: #050809;
-  --cortex-text-muted: #5A6872;
-  --cortex-accent: #00A3AD;
-  --cortex-accent-hover: #008790;
+  /* Light Mode Tokens - Neo-Brutalist Light with Deep Sapphire Blue Typography */
+  --cortex-bg: #FFFFFF;             /* Clean crisp canvas */
+  --cortex-bg-alt: #F8F9FA;         /* Elevated sidebar/panel surface */
+  --cortex-surface-1: #F1F4F6;      /* Card surface */
+  --cortex-surface-2: #E5E9EC;      /* Hover and active states */
+  --cortex-border: #CBD5E1;         /* Crisp cool border */
+  --cortex-border-strong: #94A3B8;  /* Defined divider */
+  --cortex-text: #1E3A8A;           /* Deep Sapphire Blue primary text (WCAG AAA >= 11:1) */
+  --cortex-text-muted: #3B5B82;     /* Muted denim blue secondary text (WCAG AA >= 4.8:1) */
+  --cortex-accent: #00A3AD;         /* High-contrast Cosmic Cyan for light canvas */
+  --cortex-accent-hover: #008790;   /* Accent hover */
   --cortex-accent-muted: rgba(0, 163, 173, 0.12);
   --cortex-error: #DC2626;
   --cortex-success: #059669;
@@ -116,11 +117,11 @@ textarea {
   -webkit-user-select: text !important;
 }
 
-/* Force dark styling on select & option elements under all webview environments */
+/* Force contextual styling on select & option elements across themes and webviews */
 select, option {
-  background-color: #0B1013 !important;
-  color: #F8F9FA !important;
-  border-color: #162026 !important;
+  background-color: var(--cortex-bg-alt) !important;
+  color: var(--cortex-text) !important;
+  border-color: var(--cortex-border) !important;
 }
 
 select {

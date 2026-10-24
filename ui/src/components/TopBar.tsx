@@ -3,6 +3,7 @@ import {
   useAetherStore,
   toggleCommandPalette,
   toggleThemeModal,
+  setAetherTheme,
   toggleBackgroundDrawer,
   equalizeLayout,
   splitActivePane,
@@ -36,6 +37,8 @@ import {
   Palette,
   Layers,
   Search,
+  SunMedium,
+  Moon,
 } from 'lucide-react';
 
 export interface TopBarProps {
@@ -147,6 +150,35 @@ export const TopBar: React.FC<TopBarProps> = ({
           data-testid="btn-ai-settings"
         >
           <Bot className="w-3.5 h-3.5 text-cortex-accent" />
+        </button>
+
+        {/* Quick Dark / Light Theme Toggle */}
+        <button
+          onClick={() => {
+            const isLight =
+              store.currentTheme?.includes('light') ||
+              store.currentTheme?.includes('latte') ||
+              store.currentTheme?.includes('day');
+            setAetherTheme(isLight ? 'aethercortex-dark' : 'aethercortex-light');
+          }}
+          className="p-1 rounded text-cortex-textMuted hover:text-cortex-accent hover:bg-cortex-surface2 transition-colors"
+          title={
+            store.currentTheme?.includes('light') ||
+            store.currentTheme?.includes('latte') ||
+            store.currentTheme?.includes('day')
+              ? 'Switch to Dark Theme'
+              : 'Switch to Light Theme'
+          }
+          data-testid="btn-toggle-light-theme"
+          aria-label="Toggle Light Theme"
+        >
+          {store.currentTheme?.includes('light') ||
+          store.currentTheme?.includes('latte') ||
+          store.currentTheme?.includes('day') ? (
+            <Moon className="w-3.5 h-3.5 text-cortex-accent" />
+          ) : (
+            <SunMedium className="w-3.5 h-3.5 text-cortex-accent" />
+          )}
         </button>
 
         {/* Compact Quick Tools Dropdown */}

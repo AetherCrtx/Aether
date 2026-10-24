@@ -233,8 +233,8 @@ describe('Milestone 1 Challenger Stress & Property Tests', () => {
       bgAlt: '#0B1013',
       surface1: '#0E1418',
       surface2: '#121A1F',
-      text: '#F8F9FA',
-      textMuted: '#8E9BA4',
+      text: '#93C5FD',
+      textMuted: '#7096BD',
       accent: '#00F0FF',
       accentHover: '#38F4FF',
       error: '#FF3B5C',
@@ -249,8 +249,8 @@ describe('Milestone 1 Challenger Stress & Property Tests', () => {
       bgAlt: '#F8F9FA',
       surface1: '#F1F4F6',
       surface2: '#E5E9EC',
-      text: '#050809',
-      textMuted: '#5A6872',
+      text: '#1E3A8A',
+      textMuted: '#3B5B82',
       accent: '#00A3AD',
       accentHover: '#008790',
       error: '#DC2626',
@@ -487,7 +487,7 @@ describe('Milestone 1 Challenger Stress & Property Tests', () => {
       });
 
       assert.equal(term.options.theme?.background, '#050809');
-      assert.equal(term.options.theme?.foreground, '#F8F9FA');
+      assert.equal(term.options.theme?.foreground, '#93C5FD');
       assert.equal(term.options.theme?.cursor, '#00F0FF');
 
       // 2. Simulate reactive theme change effect from XtermWebGLPane:
@@ -506,7 +506,7 @@ describe('Milestone 1 Challenger Stress & Property Tests', () => {
       syncTerminalTheme(getAetherState().currentTheme);
 
       assert.equal(term.options.theme?.background, '#FFFFFF');
-      assert.equal(term.options.theme?.foreground, '#050809');
+      assert.equal(term.options.theme?.foreground, '#1E3A8A');
       assert.equal(term.options.theme?.cursor, '#00A3AD');
 
       // Switch back to Dark Mode
@@ -514,7 +514,7 @@ describe('Milestone 1 Challenger Stress & Property Tests', () => {
       syncTerminalTheme(getAetherState().currentTheme);
 
       assert.equal(term.options.theme?.background, '#050809');
-      assert.equal(term.options.theme?.foreground, '#F8F9FA');
+      assert.equal(term.options.theme?.foreground, '#93C5FD');
       assert.equal(term.options.theme?.cursor, '#00F0FF');
     });
 
